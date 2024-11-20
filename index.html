@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>My Travel Map</title>
+    <!-- Mapbox GL JS CSS -->
+    <link href="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css" rel="stylesheet" />
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+    <!-- Custom CSS -->
+    <style>
+        body { margin: 0; font-family: Arial, sans-serif; }
+        #map { height: 600px; width: 100%; }
+        #controls { margin: 20px; }
+        #chart { width: 100%; height: 400px; }
+        .input-field { margin-right: 10px; }
+        .slider-container { margin-top: 20px; }
+        .slider-label { display: inline-block; width: 200px; }
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <h1 class="text-center">My Travel Map</h1>
+
+        <div id="controls" class="form-inline text-center">
+            <div class="form-group">
+                <input type="text" id="cityInput" class="form-control input-field" placeholder="Enter City Name">
+            </div>
+            <div class="form-group">
+                <input type="text" id="stateInput" class="form-control input-field" placeholder="Enter State Name">
+            </div>
+            <div class="form-group">
+                <input type="text" id="zipInput" class="form-control input-field" placeholder="Enter ZIP Code">
+            </div>
+            <button id="addCity" class="btn btn-primary">Add City</button>
+            <button id="addState" class="btn btn-primary">Add State</button>
+            <button id="addZip" class="btn btn-primary">Add ZIP Code</button>
+        </div>
+
+        <div id="map"></div>
+
+        <div id="chart"></div>
+    </div>
+
+    <!-- Mapbox GL JS -->
+    <script src="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.js"></script>
+    <!-- D3.js -->
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <!-- Bootstrap JS (optional for components that require JavaScript) -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.4/jquery.min.js"></script>
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+    <!-- Custom JS -->
+    <script src="app.js"></script>
+
+</body>
+</html>
