@@ -5,8 +5,8 @@ mapboxgl.accessToken = 'pk.eyJ1IjoibWF0dGhld2ptaWxsZXI3IiwiYSI6ImNtM3FldDJnbDBua
 var map = new mapboxgl.Map({
     container: 'map',
     style: 'mapbox://styles/mapbox/streets-v12',
-    center: [-96, 37.8], // Centered over the USA
-    zoom: 3
+    center: [-98.5795, 39.8283], // Centered over the contiguous USA
+    zoom: 4
 });
 
 // Add navigation controls to the map
@@ -15,7 +15,7 @@ map.addControl(new mapboxgl.NavigationControl());
 // Data structures to store visited locations
 var visitedStates = new Set();
 var visitedCities = new Set();
-var visitedZipCodes = new Set();
+var visitedZipCodes = new Set(); // Stored for future implementation
 var allData = []; // Stores all visited locations
 
 // Function to add a marker to the map
@@ -24,6 +24,32 @@ function addMarker(lat, lon, popupText) {
         .setLngLat([lon, lat])
         .setPopup(new mapboxgl.Popup().setHTML(popupText))
         .addTo(map);
+}
+
+// Function to add a location to the data structures and update the map and chart
+function addLocation(lat, lon, city, state, zip) {
+    // Add to data structures
+    if (state) visitedStates.add(state);
+    if (city) visitedCities.add(city);
+    if (zip) visitedZipCodes.add(zip); // Stored for future implementation
+
+    allData.push({
+        lat,
+        lon,
+        city,
+        state,
+        zip
+    });
+
+    // Add marker
+    var popupText = `${city || ''}${city && state ? ', ' : ''}${state || ''}`;
+    addMarker(lat, lon, popupText);
+
+    // Update chart
+    updateChart();
+
+    // Save data
+    saveData();
 }
 
 // Function to update the chart using D3.js
@@ -89,13 +115,13 @@ function updateChart() {
 
 // Function to fetch coordinates from GeoNames API
 function fetchCoordinates(query, type) {
-    var username = 'YOUR_GEONAMES_USERNAME'; // Replace with your GeoNames username
+    var username = 'matthewjmiller07'; // Replace with your GeoNames username
     var url = '';
 
     if (type === 'city') {
         url = `https://secure.geonames.org/searchJSON?q=${encodeURIComponent(query)}&maxRows=1&username=${username}`;
     } else if (type === 'state') {
-        url = `https://secure.geonames.org/searchJSON?adminCode1=${encodeURIComponent(query)}&country=US&maxRows=1&username=${username}`;
+        url = `https://secure.geonames.org/searchJSON?adminName1=${encodeURIComponent(query)}&country=US&maxRows=1&username=${username}`;
     } else if (type === 'zip') {
         url = `https://secure.geonames.org/postalCodeSearchJSON?postalcode=${encodeURIComponent(query)}&country=US&maxRows=1&username=${username}`;
     }
@@ -111,28 +137,8 @@ function fetchCoordinates(query, type) {
                 var city = result.name || result.placeName;
                 var zip = result.postalcode || query;
 
-                // Add to data structures
-                if (state) visitedStates.add(state);
-                if (city) visitedCities.add(city);
-                if (zip) visitedZipCodes.add(zip); // Stored for future implementation
-
-                allData.push({
-                    lat,
-                    lon,
-                    city,
-                    state,
-                    zip
-                });
-
-                // Add marker
-                var popupText = `${city || ''}${city && state ? ', ' : ''}${state || ''}`;
-                addMarker(lat, lon, popupText);
-
-                // Update chart
-                updateChart();
-
-                // Save data
-                saveData();
+                // Use the addLocation function to add the location
+                addLocation(lat, lon, city, state, zip);
             } else {
                 alert('Location not found. Please try again.');
             }
@@ -154,8 +160,6 @@ document.getElementById('addCity').addEventListener('click', function() {
 document.getElementById('addState').addEventListener('click', function() {
     var state = document.getElementById('stateInput').value;
     if (state) {
-        // For states, we use a predefined location to place the marker
-        // Alternatively, you could fetch the state's centroid or capital
         fetchCoordinates(state, 'state');
         document.getElementById('stateInput').value = '';
     }
@@ -169,7 +173,7 @@ document.getElementById('addZip').addEventListener('click', function() {
     }
 });
 
-// Map click event
+// Map click event - displays a popup before adding the location
 map.on('click', function(e) {
     var lon = e.lngLat.lng;
     var lat = e.lngLat.lat;
@@ -186,27 +190,27 @@ map.on('click', function(e) {
                 var state = result.adminName1;
                 var city = result.name;
 
-                // Add to data structures
-                if (state) visitedStates.add(state);
-                if (city) visitedCities.add(city);
+                // Create a popup with an "Add Location" button
+                var popupContent = `
+                    <div>
+                        <p>${city}, ${state}</p>
+                        <button id="addLocationButton" class="btn btn-primary btn-sm">Add Location</button>
+                    </div>
+                `;
 
-                allData.push({
-                    lat,
-                    lon,
-                    city,
-                    state
-                    // ZIP code is not available in this case
-                });
+                var popup = new mapboxgl.Popup()
+                    .setLngLat([lon, lat])
+                    .setHTML(popupContent)
+                    .addTo(map);
 
-                // Add marker
-                var popupText = `${city}, ${state}`;
-                addMarker(lat, lon, popupText);
-
-                // Update chart
-                updateChart();
-
-                // Save data
-                saveData();
+                // Add event listener for the "Add Location" button
+                // Use a timeout to ensure the DOM element exists
+                setTimeout(() => {
+                    document.getElementById('addLocationButton').addEventListener('click', function() {
+                        addLocation(lat, lon, city, state);
+                        popup.remove(); // Close the popup after adding
+                    });
+                }, 0);
             } else {
                 alert('No nearby location found.');
             }
