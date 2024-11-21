@@ -15,50 +15,90 @@ map.addControl(new mapboxgl.NavigationControl());
 // Data structures to store visited locations
 var visitedStates = new Set();
 var visitedCities = new Set();
-var visitedZipCodes = new Set(); // Stored for future implementation
+var visitedZipCodes = new Set();
+var visitedCountries = new Set();
 var allData = []; // Stores all visited locations
+
 // Global variable to store markers
 var markerGroup = [];
 
 // Function to add a marker to the map
+function addMarker(lat, lon, popupText, location) {
+    var popupContent = `
+        <div>
+            <p>${popupText}</p>
+            <button id="livedInButton" class="btn btn-secondary btn-sm">Mark as Lived In</button>
+        </div>
+    `;
 
-
-// Function to add a marker to the map
-function addMarker(lat, lon, popupText) {
     var marker = new mapboxgl.Marker()
         .setLngLat([lon, lat])
-        .setPopup(new mapboxgl.Popup().setHTML(popupText))
+        .setPopup(new mapboxgl.Popup().setHTML(popupContent))
         .addTo(map);
 
     // Add marker to markerGroup
     markerGroup.push(marker);
+
+    // Event listener for "Mark as Lived In" button
+    marker.getPopup().on('open', function() {
+        // Use event delegation to handle dynamic elements
+        document.getElementById('livedInButton').addEventListener('click', function() {
+            markAsLivedIn(location);
+            marker.getPopup().remove(); // Close the popup after marking
+        });
+    });
+}
+
+// Function to mark a location as "Lived In"
+function markAsLivedIn(location) {
+    location.livedIn = true;
+    saveData();
+    updateCitiesTable(); // Update the cities table to reflect the change
+    alert(`Marked ${location.city}, ${location.state} as lived in.`);
 }
 
 // Function to add a location to the data structures and update the map and chart
-function addLocation(lat, lon, city, state, zip) {
+function addLocation(lat, lon, city, state, zip, country) {
+    // Check if the location already exists
+    var existingLocation = allData.find(loc => loc.lat === lat && loc.lon === lon);
+
+    if (existingLocation) {
+        existingLocation.visitCount += 1;
+    } else {
+        var newLocation = {
+            lat,
+            lon,
+            city,
+            state,
+            zip,
+            country,
+            visitCount: 1,
+            livedIn: false
+        };
+        allData.push(newLocation);
+    }
+
     // Add to data structures
     if (state) visitedStates.add(state);
     if (city) visitedCities.add(city);
-    if (zip) visitedZipCodes.add(zip); // Stored for future implementation
-
-    allData.push({
-        lat,
-        lon,
-        city,
-        state,
-        zip
-    });
+    if (zip) visitedZipCodes.add(zip);
+    if (country) visitedCountries.add(country);
 
     // Add marker
     var popupText = `${city || ''}${city && state ? ', ' : ''}${state || ''}`;
-    addMarker(lat, lon, popupText);
+    addMarker(lat, lon, popupText, existingLocation || newLocation);
 
-    // Update chart
+    // Update visualizations
     updateChart();
-
-    // Update tables
     updateStatesTable();
     updateCitiesTable();
+    updateCountriesTable();
+    updateZipCodesTable();
+
+    // Update heatmap data if available
+    if (map.getSource('visited-places')) {
+        map.getSource('visited-places').setData(getVisitedPlacesGeoJSON());
+    }
 
     // Save data
     saveData();
@@ -71,9 +111,10 @@ function updateChart() {
 
     // Data for the chart
     var data = [
+        { label: 'Countries', value: visitedCountries.size },
         { label: 'States', value: visitedStates.size },
         { label: 'Cities', value: visitedCities.size },
-        { label: 'ZIP Codes', value: visitedZipCodes.size } // Add ZIP codes
+        { label: 'ZIP Codes', value: visitedZipCodes.size }
     ];
 
     var width = 600;
@@ -184,85 +225,82 @@ document.getElementById('addZip').addEventListener('click', function() {
     }
 });
 
-// Map click event - displays a popup before adding the location
-map.on('click', function(e) {
-    var lon = e.lngLat.lng;
-    var lat = e.lngLat.lat;
+// Function to display city options when multiple results are found
+function displayCityOptions(results, query) {
+    // Create options for the select dropdown
+    var options = results.map((result, index) => {
+        return `<option value="${index}">${result.name}, ${result.adminName1}, ${result.countryName}</option>`;
+    }).join('');
 
-    // Reverse geocoding to get city and state
-    var username = 'YOUR_GEONAMES_USERNAME'; // Replace with your GeoNames username
-    var url = `https://secure.geonames.org/findNearbyPlaceNameJSON?lat=${lat}&lng=${lon}&username=${username}`;
-
-    fetch(url)
-        .then(response => response.json())
-        .then(data => {
-            if (data.geonames && data.geonames.length > 0) {
-                var result = data.geonames[0];
-                var state = result.adminName1;
-                var city = result.name;
-
-                // Create a popup with an "Add Location" button
-                var popupContent = `
-                    <div>
-                        <p>${city}, ${state}</p>
-                        <button id="addLocationButton" class="btn btn-primary btn-sm">Add Location</button>
+    // Create the modal HTML using Bootstrap classes
+    var modalHTML = `
+        <div id="citySelectionModal" class="modal fade in" tabindex="-1" role="dialog" style="display:block;">
+            <div class="modal-dialog" role="document">
+                <div class="modal-content">
+                    <div class="modal-header">
+                        <h5 class="modal-title">Select the correct location for "${query}"</h5>
+                        <button type="button" class="close" id="closeModal">&times;</button>
                     </div>
-                `;
+                    <div class="modal-body">
+                        <select id="citySelect" class="form-control">
+                            ${options}
+                        </select>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" id="selectCityButton" class="btn btn-primary">Select</button>
+                        <button type="button" class="btn btn-secondary" id="cancelModal">Cancel</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    `;
 
-                var popup = new mapboxgl.Popup()
-                    .setLngLat([lon, lat])
-                    .setHTML(popupContent)
-                    .addTo(map);
+    // Append the modal to the body
+    document.body.insertAdjacentHTML('beforeend', modalHTML);
 
-                // Add event listener for the "Add Location" button
-                // Use a timeout to ensure the DOM element exists
-                setTimeout(() => {
-                    document.getElementById('addLocationButton').addEventListener('click', function() {
-                        addLocation(lat, lon, city, state);
-                        popup.remove(); // Close the popup after adding
-                    });
-                }, 0);
-            } else {
-                alert('No nearby location found.');
-            }
-        })
-        .catch(error => {
-            console.error('Error fetching data:', error);
-        });
-});
+    // Initialize Bootstrap modal
+    $('#citySelectionModal').modal({
+        backdrop: 'static',
+        keyboard: false
+    });
 
-// Save data to localStorage
-function saveData() {
-    localStorage.setItem('allData', JSON.stringify(allData));
-    localStorage.setItem('visitedStates', JSON.stringify([...visitedStates]));
-    localStorage.setItem('visitedCities', JSON.stringify([...visitedCities]));
-    localStorage.setItem('visitedZipCodes', JSON.stringify([...visitedZipCodes]));
-}
+    // Event listener for the select button
+    document.getElementById('selectCityButton').addEventListener('click', function() {
+        var selectedIndex = document.getElementById('citySelect').value;
+        var selectedResult = results[selectedIndex];
+        processLocationResult(selectedResult, 'city');
+        closeModal();
+    });
 
-// Load data from localStorage
-function loadData() {
-    var data = JSON.parse(localStorage.getItem('allData'));
-    var states = JSON.parse(localStorage.getItem('visitedStates'));
-    var cities = JSON.parse(localStorage.getItem('visitedCities'));
-    var zips = JSON.parse(localStorage.getItem('visitedZipCodes'));
+    // Event listener for the close button
+    document.getElementById('closeModal').addEventListener('click', closeModal);
 
-    if (data) {
-        allData = data;
-        visitedStates = new Set(states);
-        visitedCities = new Set(cities);
-        visitedZipCodes = new Set(zips);
+    // Event listener for the cancel button
+    document.getElementById('cancelModal').addEventListener('click', closeModal);
 
-        allData.forEach(location => {
-            var popupText = `${location.city || ''}${location.city && location.state ? ', ' : ''}${location.state || ''}`;
-            addMarker(location.lat, location.lon, popupText);
-        });
-
-        updateChart();
-        updateStatesTable();
-        updateCitiesTable();
+    function closeModal() {
+        var modal = document.getElementById('citySelectionModal');
+        if (modal) {
+            $(modal).modal('hide');
+            modal.parentNode.removeChild(modal);
+        }
     }
 }
 
+// Function to process a single location result
+function processLocationResult(result, type) {
+    var lat = parseFloat(result.lat);
+    var lon = parseFloat(result.lng || result.lon);
+    var state = result.adminName1;
+    var city = result.name || result.placeName;
+    var zip = result.postalcode || '';
+    var country = result.countryName || '';
+
+    // Use the addLocation function to add the location
+    addLocation(lat, lon, city, state, zip, country);
+}
+
+// Function to update the states table
 function updateStatesTable() {
     // Clear previous table
     d3.select('#statesTable').html('');
@@ -289,11 +327,28 @@ function updateStatesTable() {
         .text(d => d);
 }
 
+// Function to update the cities table
 function updateCitiesTable() {
     // Clear previous table
     d3.select('#citiesTable').html('');
 
-    var data = Array.from(visitedCities).sort();
+    // Convert allData to an array of unique city-state combinations
+    var data = Array.from(visitedCities).map(cityName => {
+        // Find all locations that match the city
+        var locations = allData.filter(d => d.city === cityName);
+        // Aggregate states if the same city exists in multiple states
+        var states = Array.from(new Set(locations.map(loc => loc.state))).sort();
+        var stateString = states.join(', ');
+        // Check if any of the locations are marked as lived in
+        var livedIn = locations.some(loc => loc.livedIn);
+        return {
+            city: cityName,
+            state: stateString,
+            livedIn: livedIn ? 'Yes' : 'No'
+        };
+    });
+
+    data.sort((a, b) => a.city.localeCompare(b.city));
 
     var table = d3.select('#citiesTable').append('table').attr('class', 'table table-striped table-bordered');
     var thead = table.append('thead');
@@ -301,8 +356,41 @@ function updateCitiesTable() {
 
     // Header
     thead.append('tr')
+        .selectAll('th')
+        .data(['City', 'State', 'Lived In'])
+        .enter()
         .append('th')
-        .text('City');
+        .text(d => d);
+
+    // Rows
+    var rows = tbody.selectAll('tr')
+        .data(data)
+        .enter()
+        .append('tr');
+
+    // Cells
+    rows.selectAll('td')
+        .data(d => [d.city, d.state, d.livedIn])
+        .enter()
+        .append('td')
+        .text(d => d);
+}
+
+// Function to update the countries table
+function updateCountriesTable() {
+    // Clear previous table
+    d3.select('#countriesTable').html('');
+
+    var data = Array.from(visitedCountries).sort();
+
+    var table = d3.select('#countriesTable').append('table').attr('class', 'table table-striped table-bordered');
+    var thead = table.append('thead');
+    var tbody = table.append('tbody');
+
+    // Header
+    thead.append('tr')
+        .append('th')
+        .text('Country');
 
     // Rows
     var rows = tbody.selectAll('tr')
@@ -315,36 +403,224 @@ function updateCitiesTable() {
         .text(d => d);
 }
 
+// Function to update the ZIP Codes table
+function updateZipCodesTable() {
+    // Clear previous table
+    d3.select('#zipCodesTable').html('');
+
+    var data = Array.from(visitedZipCodes).sort();
+
+    var table = d3.select('#zipCodesTable').append('table').attr('class', 'table table-striped table-bordered');
+    var thead = table.append('thead');
+    var tbody = table.append('tbody');
+
+    // Header
+    thead.append('tr')
+        .append('th')
+        .text('ZIP Code');
+
+    // Rows
+    var rows = tbody.selectAll('tr')
+        .data(data)
+        .enter()
+        .append('tr');
+
+    // Cells
+    rows.append('td')
+        .text(d => d);
+}
+
+// Function to update the heatmap using Mapbox
+function updateHeatmap() {
+    if (!map.getSource('visited-places')) {
+        // Add a source for the heatmap
+        map.addSource('visited-places', {
+            type: 'geojson',
+            data: getVisitedPlacesGeoJSON()
+        });
+
+        // Add a heatmap layer
+        map.addLayer({
+            id: 'heatmap-layer',
+            type: 'heatmap',
+            source: 'visited-places',
+            maxzoom: 15,
+            paint: {
+                // Increase the heatmap weight based on frequency of visits
+                'heatmap-weight': ['interpolate', ['linear'], ['get', 'visitCount'], 0, 0, 6, 1],
+                // Increase the heatmap intensity based on zoom level
+                'heatmap-intensity': ['interpolate', ['linear'], ['zoom'], 0, 1, 15, 3],
+                // Color ramp for heatmap
+                'heatmap-color': [
+                    'interpolate',
+                    ['linear'],
+                    ['heatmap-density'],
+                    0, 'rgba(33,102,172,0)',
+                    0.2, 'rgb(103,169,207)',
+                    0.4, 'rgb(209,229,240)',
+                    0.6, 'rgb(253,219,199)',
+                    0.8, 'rgb(239,138,98)',
+                    1, 'rgb(178,24,43)'
+                ],
+                // Adjust the heatmap radius by zoom level
+                'heatmap-radius': ['interpolate', ['linear'], ['zoom'], 0, 2, 15, 20],
+                // Transition from heatmap to circle layer by zoom level
+                'heatmap-opacity': ['interpolate', ['linear'], ['zoom'], 13, 1, 15, 0]
+            }
+        });
+
+        // Add a circle layer to show individual points when zoomed in
+        map.addLayer({
+            id: 'heatmap-point',
+            type: 'circle',
+            source: 'visited-places',
+            minzoom: 14,
+            paint: {
+                'circle-radius': 4,
+                'circle-color': '#ff0000',
+                'circle-opacity': ['case', ['boolean', ['get', 'livedIn'], false], 1, 0.6]
+            }
+        });
+    } else {
+        // Update the data for the heatmap source
+        map.getSource('visited-places').setData(getVisitedPlacesGeoJSON());
+    }
+}
+
+// Function to get GeoJSON data for the heatmap
+function getVisitedPlacesGeoJSON() {
+    return {
+        type: 'FeatureCollection',
+        features: allData.map(location => ({
+            type: 'Feature',
+            properties: {
+                visitCount: location.visitCount,
+                livedIn: location.livedIn
+            },
+            geometry: {
+                type: 'Point',
+                coordinates: [location.lon, location.lat]
+            }
+        }))
+    };
+}
+
+// Function to reset all data and the map
 function resetData() {
-    // Clear data structures
-    visitedStates.clear();
-    visitedCities.clear();
-    visitedZipCodes.clear();
-    visitedCountries.clear();
-    allData = [];
+    if (confirm('Are you sure you want to reset all data? This action cannot be undone.')) {
+        // Clear data structures
+        visitedStates.clear();
+        visitedCities.clear();
+        visitedZipCodes.clear();
+        visitedCountries.clear();
+        allData = [];
 
-    // Remove all markers from the map
-    markerGroup.forEach(marker => marker.remove());
-    markerGroup = [];
+        // Remove all markers from the map
+        markerGroup.forEach(marker => marker.remove());
+        markerGroup = [];
 
-    // Clear localStorage
-    localStorage.clear();
+        // Remove heatmap layers and sources
+        if (map.getLayer('heatmap-layer')) {
+            map.removeLayer('heatmap-layer');
+        }
+        if (map.getLayer('heatmap-point')) {
+            map.removeLayer('heatmap-point');
+        }
+        if (map.getSource('visited-places')) {
+            map.removeSource('visited-places');
+        }
 
-    // Update visualizations
-    updateChart();
-    updateStatesTable();
-    updateCitiesTable();
-    updateCountriesTable();
-    updateZipCodesTable();
+        // Clear localStorage
+        localStorage.clear();
 
-    alert('All data has been reset.');
+        // Update visualizations
+        updateChart();
+        updateStatesTable();
+        updateCitiesTable();
+        updateCountriesTable();
+        updateZipCodesTable();
+
+        alert('All data has been reset.');
+    }
 }
 
 // Event listener for the reset button
-document.getElementById('resetMap').addEventListener('click', function() {
-    if (confirm('Are you sure you want to reset all data? This action cannot be undone.')) {
-        resetData();
-    }
+document.getElementById('resetMap').addEventListener('click', resetData);
+
+// Function to initialize the heatmap when the map loads
+map.on('load', function() {
+    // Initialize the heatmap with existing data
+    updateHeatmap();
 });
+
+// Function to handle map clicks
+map.on('click', function(e) {
+    var lon = e.lngLat.lng;
+    var lat = e.lngLat.lat;
+
+    // Reverse geocoding to get nearby places
+    var username = 'matthewjmiller07'; // Replace with your GeoNames username
+    var url = `https://secure.geonames.org/findNearbyPlaceNameJSON?lat=${lat}&lng=${lon}&radius=10&maxRows=10&username=${username}`;
+
+    fetch(url)
+        .then(response => response.json())
+        .then(data => {
+            if (data.geonames && data.geonames.length > 0) {
+                if (data.geonames.length > 1) {
+                    // Multiple places found, prompt user to select
+                    displayCityOptions(data.geonames, data.geonames[0].name);
+                } else {
+                    var result = data.geonames[0];
+                    processLocationResult(result, 'city');
+                }
+            } else {
+                alert('No nearby location found.');
+            }
+        })
+        .catch(error => {
+            console.error('Error fetching data:', error);
+        });
+});
+
+// Save data to localStorage
+function saveData() {
+    localStorage.setItem('allData', JSON.stringify(allData));
+    localStorage.setItem('visitedStates', JSON.stringify([...visitedStates]));
+    localStorage.setItem('visitedCities', JSON.stringify([...visitedCities]));
+    localStorage.setItem('visitedZipCodes', JSON.stringify([...visitedZipCodes]));
+    localStorage.setItem('visitedCountries', JSON.stringify([...visitedCountries]));
+}
+
+// Load data from localStorage
+function loadData() {
+    var data = JSON.parse(localStorage.getItem('allData'));
+    var states = JSON.parse(localStorage.getItem('visitedStates'));
+    var cities = JSON.parse(localStorage.getItem('visitedCities'));
+    var zips = JSON.parse(localStorage.getItem('visitedZipCodes'));
+    var countries = JSON.parse(localStorage.getItem('visitedCountries'));
+
+    if (data) {
+        allData = data;
+        visitedStates = new Set(states);
+        visitedCities = new Set(cities);
+        visitedZipCodes = new Set(zips);
+        visitedCountries = new Set(countries);
+
+        allData.forEach(location => {
+            var popupText = `${location.city || ''}${location.city && location.state ? ', ' : ''}${location.state || ''}`;
+            addMarker(location.lat, location.lon, popupText, location);
+        });
+
+        updateChart();
+        updateStatesTable();
+        updateCitiesTable();
+        updateCountriesTable();
+        updateZipCodesTable();
+
+        // Initialize heatmap with loaded data
+        updateHeatmap();
+    }
+}
+
 // Call loadData when the application starts
 loadData();
