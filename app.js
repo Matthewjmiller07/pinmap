@@ -48,6 +48,10 @@ function addLocation(lat, lon, city, state, zip) {
     // Update chart
     updateChart();
 
+    // Update tables
+    updateStatesTable();
+    updateCitiesTable();
+
     // Save data
     saveData();
 }
@@ -60,8 +64,8 @@ function updateChart() {
     // Data for the chart
     var data = [
         { label: 'States', value: visitedStates.size },
-        { label: 'Cities', value: visitedCities.size }
-        // ZIP codes are stored for future implementation
+        { label: 'Cities', value: visitedCities.size },
+        { label: 'ZIP Codes', value: visitedZipCodes.size } // Add ZIP codes
     ];
 
     var width = 600;
@@ -247,7 +251,61 @@ function loadData() {
         });
 
         updateChart();
+        updateStatesTable();
+        updateCitiesTable();
     }
+}
+
+function updateStatesTable() {
+    // Clear previous table
+    d3.select('#statesTable').html('');
+
+    var data = Array.from(visitedStates).sort();
+
+    var table = d3.select('#statesTable').append('table').attr('class', 'table table-striped table-bordered');
+    var thead = table.append('thead');
+    var tbody = table.append('tbody');
+
+    // Header
+    thead.append('tr')
+        .append('th')
+        .text('State');
+
+    // Rows
+    var rows = tbody.selectAll('tr')
+        .data(data)
+        .enter()
+        .append('tr');
+
+    // Cells
+    rows.append('td')
+        .text(d => d);
+}
+
+function updateCitiesTable() {
+    // Clear previous table
+    d3.select('#citiesTable').html('');
+
+    var data = Array.from(visitedCities).sort();
+
+    var table = d3.select('#citiesTable').append('table').attr('class', 'table table-striped table-bordered');
+    var thead = table.append('thead');
+    var tbody = table.append('tbody');
+
+    // Header
+    thead.append('tr')
+        .append('th')
+        .text('City');
+
+    // Rows
+    var rows = tbody.selectAll('tr')
+        .data(data)
+        .enter()
+        .append('tr');
+
+    // Cells
+    rows.append('td')
+        .text(d => d);
 }
 
 // Call loadData when the application starts
