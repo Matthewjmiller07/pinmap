@@ -17,6 +17,11 @@ var visitedStates = new Set();
 var visitedCities = new Set();
 var visitedZipCodes = new Set(); // Stored for future implementation
 var allData = []; // Stores all visited locations
+// Global variable to store markers
+var markerGroup = [];
+
+// Function to add a marker to the map
+
 
 // Function to add a marker to the map
 function addMarker(lat, lon, popupText) {
@@ -24,6 +29,9 @@ function addMarker(lat, lon, popupText) {
         .setLngLat([lon, lat])
         .setPopup(new mapboxgl.Popup().setHTML(popupText))
         .addTo(map);
+
+    // Add marker to markerGroup
+    markerGroup.push(marker);
 }
 
 // Function to add a location to the data structures and update the map and chart
@@ -119,11 +127,11 @@ function updateChart() {
 
 // Function to fetch coordinates from GeoNames API
 function fetchCoordinates(query, type) {
-    var username = 'matthewjmiller07'; // Replace with your GeoNames username
+    var username = 'matthewjmiller07'; // Use your GeoNames username 
     var url = '';
 
     if (type === 'city') {
-        url = `https://secure.geonames.org/searchJSON?q=${encodeURIComponent(query)}&maxRows=1&username=${username}`;
+        url = `https://secure.geonames.org/searchJSON?q=${encodeURIComponent(query)}&maxRows=10&username=${username}`;
     } else if (type === 'state') {
         url = `https://secure.geonames.org/searchJSON?adminName1=${encodeURIComponent(query)}&country=US&maxRows=1&username=${username}`;
     } else if (type === 'zip') {
@@ -134,15 +142,14 @@ function fetchCoordinates(query, type) {
         .then(response => response.json())
         .then(data => {
             if ((data.geonames && data.geonames.length > 0) || (data.postalCodes && data.postalCodes.length > 0)) {
-                var result = data.geonames ? data.geonames[0] : data.postalCodes[0];
-                var lat = parseFloat(result.lat);
-                var lon = parseFloat(result.lng || result.lon);
-                var state = result.adminName1;
-                var city = result.name || result.placeName;
-                var zip = result.postalcode || query;
-
-                // Use the addLocation function to add the location
-                addLocation(lat, lon, city, state, zip);
+                if (type === 'city' && data.geonames.length > 1) {
+                    // Multiple city results found, prompt user to select
+                    displayCityOptions(data.geonames, query);
+                } else {
+                    // Process single result
+                    var result = data.geonames ? data.geonames[0] : data.postalCodes[0];
+                    processLocationResult(result, type);
+                }
             } else {
                 alert('Location not found. Please try again.');
             }
@@ -308,5 +315,36 @@ function updateCitiesTable() {
         .text(d => d);
 }
 
+function resetData() {
+    // Clear data structures
+    visitedStates.clear();
+    visitedCities.clear();
+    visitedZipCodes.clear();
+    visitedCountries.clear();
+    allData = [];
+
+    // Remove all markers from the map
+    markerGroup.forEach(marker => marker.remove());
+    markerGroup = [];
+
+    // Clear localStorage
+    localStorage.clear();
+
+    // Update visualizations
+    updateChart();
+    updateStatesTable();
+    updateCitiesTable();
+    updateCountriesTable();
+    updateZipCodesTable();
+
+    alert('All data has been reset.');
+}
+
+// Event listener for the reset button
+document.getElementById('resetMap').addEventListener('click', function() {
+    if (confirm('Are you sure you want to reset all data? This action cannot be undone.')) {
+        resetData();
+    }
+});
 // Call loadData when the application starts
 loadData();
