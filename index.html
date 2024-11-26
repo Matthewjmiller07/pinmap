@@ -2,74 +2,1278 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <title>My Travel Map</title>
-    <!-- Mapbox GL JS CSS -->
-    <link href="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.css" rel="stylesheet" />
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PinMap App</title>
     <!-- Bootstrap CSS -->
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <!-- Custom CSS -->
     <style>
-        body { margin: 0; font-family: Arial, sans-serif; }
-        #map { height: 600px; width: 100%; }
-        #controls { margin: 20px; }
-        #chart { width: 100%; height: 400px; }
-        .input-field { margin-right: 10px; }
-        .slider-container { margin-top: 20px; }
-        .slider-label { display: inline-block; width: 200px; }
+        #map {
+            height: 500px;
+            width: 100%;
+        }
+        #chart {
+            width: 100%;
+            height: 500px;
+        }
+        /* Style for authentication buttons */
+        .auth-buttons {
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+        /* Responsive adjustments */
+        @media (max-width: 768px) {
+            #map, #chart {
+                height: 300px;
+            }
+        }
+        /* Additional styling for reset button */
+        .reset-button {
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
     </style>
+    <!-- Favicon to prevent 404 error -->
+    <link rel="icon" href="data:," />
 </head>
 <body>
-
     <div class="container">
-        <h1 class="text-center">My Travel Map</h1>
+        <h1 class="text-center">PinMap App</h1>
 
-        <div id="controls" class="form-inline text-center">
-            <div class="form-group">
-                <input type="text" id="cityInput" class="form-control input-field" placeholder="Enter City Name">
-            </div>
-            <div class="form-group">
-                <input type="text" id="stateInput" class="form-control input-field" placeholder="Enter State Name">
-            </div>
-            <div class="form-group">
-                <input type="text" id="zipInput" class="form-control input-field" placeholder="Enter ZIP Code">
-            </div>
-            <button id="addCity" class="btn btn-primary">Add City</button>
-            <button id="addState" class="btn btn-primary">Add State</button>
-            <button id="addZip" class="btn btn-primary">Add ZIP Code</button>
-            <button id="resetMap" class="btn btn-danger">Reset Map</button>
-
+        <!-- Authentication UI -->
+        <div class="auth-buttons text-center">
+            <button id="login-button" class="btn btn-primary">Login with Google</button>
+            <button id="logout-button" class="btn btn-danger" style="display: none;">Logout</button>
         </div>
 
+        <!-- User Info -->
+        <div id="user-info" class="text-center" style="display: none;">
+            <p>Welcome, <span id="user-name"></span>!</p>
+        </div>
 
-        <div id="map"></div>
+        <!-- Add Location Form -->
+        <div id="add-location-form" style="display: none;">
+            <form id="location-form">
+                <div class="form-group">
+                    <label for="city">Enter City:</label>
+                    <input type="text" id="city" class="form-control" placeholder="City" required>
+                </div>
+                <div class="form-group">
+                    <label for="state">Enter State (optional):</label>
+                    <input type="text" id="state" class="form-control" placeholder="State">
+                </div>
+                <div class="form-group">
+                    <label for="zip">Enter ZIP Code:</label>
+                    <input type="text" id="zip" class="form-control" placeholder="ZIP Code">
+                </div>
+                <button type="submit" class="btn btn-success">Add Location</button>
+            </form>
+        </div>
 
-        <div id="chart"></div>
-    </div>
+        <!-- Reset Button -->
+        <div class="reset-button text-center" style="display: none;">
+            <button id="reset-button" class="btn btn-warning">Reset All Data</button>
+        </div>
 
-    <div class="container">
-        <!-- Existing content -->
-        <h2 class="text-center">Visited Places</h2>
-        <div class="row">
-            <div class="col-md-6">
-                <h3 class="text-center">Visited States</h3>
-                <div id="statesTable" class="table-responsive"></div>
-            </div>
-            <div class="col-md-6">
-                <h3 class="text-center">Visited Cities</h3>
-                <div id="citiesTable" class="table-responsive"></div>
-            </div>
+        <!-- Map Section -->
+        <div id="map" style="margin-top: 20px; display: none;"></div>
+
+        <!-- Chart Section -->
+        <div id="chart" class="text-center" style="margin-top: 20px; display: none;"></div>
+
+        <!-- Tables Section -->
+        <div id="tables" style="margin-top: 20px; display: none;">
+            <h3>Visited States</h3>
+            <div id="statesTable" class="table-responsive"></div>
+            <h3>Visited Cities</h3>
+            <div id="citiesTable" class="table-responsive"></div>
+            <h3>Visited Countries</h3>
+            <div id="countriesTable" class="table-responsive"></div>
+            <h3>Visited ZIP Codes</h3>
+            <div id="zipCodesTable" class="table-responsive"></div>
         </div>
     </div>
 
-    <!-- Mapbox GL JS -->
-    <script src="https://api.mapbox.com/mapbox-gl-js/v2.14.1/mapbox-gl.js"></script>
-    <!-- D3.js -->
-    <script src="https://d3js.org/d3.v7.min.js"></script>
-    <!-- Bootstrap JS (optional for components that require JavaScript) -->
-    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.6.4/jquery.min.js"></script>
+    <!-- Confirmation Modal -->
+    <!-- Confirmation Modal -->
+<div id="confirmationModal" class="modal fade" role="dialog">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <form id="confirmation-form">
+                <div class="modal-header">
+                    <button type="button" class="close" data-dismiss="modal">&times;</button>
+                    <h4 class="modal-title">Confirm Location Details</h4>
+                </div>
+                <div class="modal-body">
+                    <p>Please confirm or edit the location details:</p>
+                    <!-- Dropdown for multiple location options -->
+                    <div class="form-group" id="location-options-group" style="display:none;">
+                        <label for="location-options">Select a Location:</label>
+                        <select id="location-options" class="form-control"></select>
+                    </div>
+                    <div class="form-group">
+                        <label for="confirm-city">City:</label>
+                        <input type="text" id="confirm-city" class="form-control" required>
+                    </div>
+                    <div class="form-group" id="confirm-state-group">
+                        <label for="confirm-state">State:</label>
+                        <input type="text" id="confirm-state" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="confirm-zip">ZIP Code:</label>
+                        <input type="text" id="confirm-zip" class="form-control">
+                    </div>
+                    <div class="form-group">
+                        <label for="confirm-country">Country:</label>
+                        <input type="text" id="confirm-country" class="form-control" readonly>
+                    </div>
+                    <!-- Hidden fields to store latitude and longitude -->
+                    <input type="hidden" id="confirm-lat">
+                    <input type="hidden" id="confirm-lon">
+                </div>
+                <div class="modal-footer">
+                    <button type="submit" class="btn btn-success">Confirm</button>
+                    <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+    <!-- Firebase SDKs and Application Scripts -->
+    <script type="module">
+        // Import the necessary Firebase modules
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
+        import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-analytics.js";
+        import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
+        import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCtGCpWEF0H3eNJ7hasrgQIiVsIjhbQMN8",
+            authDomain: "pinmap-31e5f.firebaseapp.com",
+            projectId: "pinmap-31e5f",
+            storageBucket: "pinmap-31e5f.firebasestorage.app",
+            messagingSenderId: "816721437507",
+            appId: "1:816721437507:web:90f786fb2b820d9247c5f6",
+            measurementId: "G-DYJHWZY7V6"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const analytics = getAnalytics(app);
+        const auth = getAuth(app);
+        const db = getFirestore(app);
+
+        console.log("Firebase initialized with config:", firebaseConfig);
+
+        // DOM Elements
+        const loginButton = document.getElementById('login-button');
+        const logoutButton = document.getElementById('logout-button');
+        const userInfo = document.getElementById('user-info');
+        const userNameSpan = document.getElementById('user-name');
+        const addLocationForm = document.getElementById('add-location-form');
+        const locationForm = document.getElementById('location-form');
+        const resetButton = document.getElementById('reset-button');
+        const mapContainer = document.getElementById('map');
+        const chartContainer = document.getElementById('chart');
+        const tablesContainer = document.getElementById('tables');
+        const confirmationModal = $('#confirmationModal');
+        const confirmStateGroup = document.getElementById('confirm-state-group');
+
+        // Application State
+        let currentUser = null;
+        let map = null;
+        let heatmapLayer = null;
+        let allData = [];
+        let markers = [];
+        let geonamesResultsGlobal = [];
+
+        const markerMap = new Map();
+
+        const geonamesUsername = "matthewjmiller07"; // Your GeoNames username
+
+        // Initialize Leaflet Map
+        function initializeMap() {
+            console.log("Initializing map.");
+            map = L.map('map').setView([20, 0], 2); // World view
+
+            // Add OpenStreetMap tiles
+            L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+                attribution: '&copy; OpenStreetMap contributors'
+            }).addTo(map);
+
+            // Initialize heatmap layer
+            heatmapLayer = L.heatLayer([], { radius: 25 }).addTo(map);
+            console.log("Map and heatmap layer initialized.");
+
+            // Add click event to map for adding locations
+            map.on('click', onMapClick);
+            console.log("Map click event listener added.");
+        }
+
+        // Handle map click
+        async function onMapClick(e) {
+            const { lat, lng } = e.latlng;
+            console.log(`Map clicked at Latitude: ${lat}, Longitude: ${lng}`);
+
+            // Reverse geocode using GeoNames API
+            try {
+                const response = await fetch(`https://secure.geonames.org/findNearbyPlaceNameJSON?lat=${lat}&lng=${lng}&username=${geonamesUsername}`);
+                const data = await response.json();
+                console.log("GeoNames Reverse Geocoding data:", data);
+
+                if (!data.geonames || data.geonames.length === 0) {
+                    alert('Unable to retrieve location details. Please try again.');
+                    return;
+                }
+
+                const geoData = data.geonames[0];
+                let city = geoData.name || "";
+                let state = geoData.adminName1 || "";
+                let zip = geoData.postalcode || "";
+                let country = geoData.countryName || "Unknown";
+
+                console.log(`Reverse geocoded to City: ${city}, State: ${state}, ZIP: ${zip}, Country: ${country}`);
+
+                // Always show confirmation modal to confirm or edit details
+                showConfirmationModal(lat, lng, city, state, zip, country);
+            } catch (error) {
+                console.error("Error during reverse geocoding with GeoNames:", error);
+                alert('Failed to retrieve location details. Please try again.');
+            }
+        }
+
+        // Function to show confirmation modal
+        function showConfirmationModal(lat, lon, city, state, zip, country, isMultipleOptions = false) {
+    const locationOptionsGroup = document.getElementById('location-options-group');
+    const locationOptionsSelect = document.getElementById('location-options');
+
+    if (isMultipleOptions && geonamesResultsGlobal.length > 1) {
+        // Multiple options, show dropdown
+        // Clear any existing options
+        locationOptionsSelect.innerHTML = '';
+
+        geonamesResultsGlobal.forEach((geoData, index) => {
+            const option = document.createElement('option');
+            option.value = index;
+            const optionText = `${geoData.name}, ${geoData.adminName1 || ''}, ${geoData.countryName}`;
+            option.textContent = optionText;
+            locationOptionsSelect.appendChild(option);
+        });
+
+        // Show the select element
+        locationOptionsGroup.style.display = 'block';
+
+        // Populate the modal fields with the first option
+        const firstGeoData = geonamesResultsGlobal[0];
+        populateModalFields(firstGeoData);
+
+        // Remove previous event listener to prevent duplicates
+        locationOptionsSelect.removeEventListener('change', locationOptionChangeHandler);
+
+        // Add event listener to update modal fields when a different option is selected
+        locationOptionsSelect.addEventListener('change', locationOptionChangeHandler);
+    } else {
+        // Single option, hide the select element
+        locationOptionsGroup.style.display = 'none';
+
+        // Populate modal fields
+        document.getElementById('confirm-city').value = city;
+        document.getElementById('confirm-state').value = state;
+        document.getElementById('confirm-zip').value = zip;
+        document.getElementById('confirm-country').value = country;
+        document.getElementById('confirm-lat').value = lat;
+        document.getElementById('confirm-lon').value = lon;
+
+        // Show or hide the state field based on the availability of state data
+        if (state) {
+            confirmStateGroup.style.display = 'block';
+            document.getElementById('confirm-state').required = true;
+        } else {
+            confirmStateGroup.style.display = 'none';
+            document.getElementById('confirm-state').required = false;
+        }
+    }
+
+    // Show the modal
+    confirmationModal.modal('show');
+}
+
+// Define the event handler for location option change
+function locationOptionChangeHandler() {
+    const selectedIndex = document.getElementById('location-options').value;
+    const selectedGeoData = geonamesResultsGlobal[selectedIndex];
+    populateModalFields(selectedGeoData);
+}
+
+function populateModalFields(geoData) {
+    const lat = parseFloat(geoData.lat);
+    const lon = parseFloat(geoData.lng);
+    const city = geoData.name || "Unknown City";
+    const state = geoData.adminName1 || "";
+    const zip = (geoData.postalCodes && geoData.postalCodes.length > 0) ? geoData.postalCodes[0].postalCode : "";
+    const country = geoData.countryName || "Unknown Country";
+
+    document.getElementById('confirm-city').value = city;
+    document.getElementById('confirm-state').value = state;
+    document.getElementById('confirm-zip').value = zip;
+    document.getElementById('confirm-country').value = country;
+    document.getElementById('confirm-lat').value = lat;
+    document.getElementById('confirm-lon').value = lon;
+
+    // Show or hide the state field based on the availability of state data
+    if (state) {
+        confirmStateGroup.style.display = 'block';
+        document.getElementById('confirm-state').required = true;
+    } else {
+        confirmStateGroup.style.display = 'none';
+        document.getElementById('confirm-state').required = false;
+    }
+}
+
+
+        // Update UI Based on Authentication
+        function updateUI(user) {
+            if (user) {
+                // User is signed in
+                currentUser = user;
+                loginButton.style.display = 'none';
+                logoutButton.style.display = 'inline-block';
+                userInfo.style.display = 'block';
+                userNameSpan.textContent = user.displayName || user.email;
+
+                // Show application sections
+                addLocationForm.style.display = 'block';
+                mapContainer.style.display = 'block';
+                chartContainer.style.display = 'block';
+                tablesContainer.style.display = 'block';
+                resetButton.parentElement.style.display = 'block';
+
+                // Initialize map if not already initialized
+                if (!map) {
+                    initializeMap();
+                }
+
+                // Load user data from Firestore
+                loadUserData();
+            } else {
+                // User is signed out
+                currentUser = null;
+                loginButton.style.display = 'inline-block';
+                logoutButton.style.display = 'none';
+                userInfo.style.display = 'none';
+
+                // Hide application sections
+                addLocationForm.style.display = 'none';
+                mapContainer.style.display = 'none';
+                chartContainer.style.display = 'none';
+                tablesContainer.style.display = 'none';
+                resetButton.parentElement.style.display = 'none';
+
+                // Clear map and heatmap
+                if (map) {
+                    map.remove();
+                    map = null;
+                    heatmapLayer = null;
+                    markers = [];
+                }
+
+                // Clear tables and chart
+                clearAllData();
+            }
+        }
+
+        // Authentication Event Listeners
+        loginButton.addEventListener('click', () => {
+            console.log("Login button clicked.");
+            const provider = new GoogleAuthProvider();
+            signInWithPopup(auth, provider)
+                .then((result) => {
+                    console.log('User signed in:', result.user);
+                })
+                .catch((error) => {
+                    console.error('Error during sign-in:', error);
+                    alert('Authentication failed. Please try again.');
+                });
+        });
+
+        logoutButton.addEventListener('click', () => {
+            console.log("Logout button clicked.");
+            signOut(auth)
+                .then(() => {
+                    console.log('User signed out.');
+                })
+                .catch((error) => {
+                    console.error('Error during sign-out:', error);
+                    alert('Sign-out failed. Please try again.');
+                });
+        });
+
+        // Listen to Authentication State Changes
+        onAuthStateChanged(auth, (user) => {
+            console.log("Authentication state changed:", user);
+            updateUI(user);
+        });
+
+        // Firestore References
+        function getUserDocRef(uid) {
+            return doc(db, 'users', uid);
+        }
+
+        // Load User Data from Firestore
+        async function loadUserData() {
+            if (!currentUser) return;
+
+            const userDocRef = getUserDocRef(currentUser.uid);
+            try {
+                const docSnap = await getDoc(userDocRef);
+                if (docSnap.exists()) {
+                    allData = docSnap.data().allData || [];
+                    console.log("User data loaded from Firestore:", allData);
+
+                    // Clear existing markers
+                    markers.forEach(marker => {
+                        map.removeLayer(marker);
+                    });
+                    markers = [];
+
+                    // Initialize Sets
+                    const visitedStates = new Set();
+                    const visitedCities = new Set();
+                    const visitedCountries = new Set();
+                    const visitedZipCodes = new Set();
+
+                    allData.forEach(location => {
+                        if (location.state && location.country.toLowerCase() === 'united states') {
+        visitedStates.add(location.state);
+    }
+                        if (location.city) visitedCities.add(location.city);
+                        if (location.country) visitedCountries.add(location.country);
+                        if (location.zip) visitedZipCodes.add(location.zip);
+                    });
+
+                    console.log("Visited States:", visitedStates);
+                    console.log("Visited Cities:", visitedCities);
+                    console.log("Visited Countries:", visitedCountries);
+                    console.log("Visited ZIP Codes:", visitedZipCodes);
+
+                    // Add markers to the map
+                    allData.forEach(location => {
+                        const popupText = `${location.city}${(location.country.toLowerCase() === 'united states' && location.state) ? ', ' + location.state : ''}`;
+                        const locationKey = `${location.lat},${location.lon}_${location.city.toLowerCase()}_${location.state.toLowerCase()}`;
+                        const popupContent = `
+                            <strong>${popupText}</strong><br>
+                            Visits: ${location.visitCount}<br>
+                            <button class="btn btn-xs btn-danger" onclick="deleteLocation('${locationKey}')">Delete</button>
+                        `;
+                        const marker = L.marker([location.lat, location.lon]).addTo(map)
+                            .bindPopup(popupContent);
+                        markers.push(marker);
+                        markerMap.set(locationKey, marker);
+                        console.log("Marker added to map:", popupText);
+                    });
+
+                    // Update visualizations
+                    updateChart(visitedCountries, visitedStates, visitedCities, visitedZipCodes);
+                    updateStatesTable(visitedStates);
+                    updateCitiesTable(visitedCities);
+                    updateCountriesTable(visitedCountries);
+                    updateZipCodesTable(visitedZipCodes);
+
+                    // Initialize heatmap with loaded data
+                    updateHeatmap();
+                } else {
+                    console.log("No data found for this user. Initializing empty data structures.");
+                    allData = [];
+                    saveData();
+                }
+            } catch (error) {
+                console.error('Error fetching user data:', error);
+                alert('Failed to load your data. Please try again.');
+            }
+        }
+
+        // Save User Data to Firestore
+        async function saveData() {
+            if (!currentUser) return;
+
+            const userDocRef = getUserDocRef(currentUser.uid);
+            try {
+                await setDoc(userDocRef, { allData }, { merge: true });
+                console.log('User data saved successfully.');
+            } catch (error) {
+                console.error('Error saving user data:', error);
+                alert('Failed to save your data. Please try again.');
+            }
+        }
+
+        // Handle Add Location Form Submission
+        // Modify the location form submission handler
+        locationForm.addEventListener('submit', async (e) => {
+    e.preventDefault();
+
+    const city = document.getElementById('city').value.trim();
+    const state = document.getElementById('state').value.trim();
+    const zip = document.getElementById('zip').value.trim();
+
+    // Allow adding with just city or just state
+    if (!city && !state) {
+        alert('Please enter at least a city or a state.');
+        return;
+    }
+
+    // Perform initial geocoding request based on user input
+    try {
+        let query = '';
+        if (city && state) {
+            query = `name_equals=${encodeURIComponent(city)}&adminName1=${encodeURIComponent(state)}`;
+        } else if (city) {
+            query = `name_equals=${encodeURIComponent(city)}`;
+        } else if (state) {
+            query = `adminName1=${encodeURIComponent(state)}`;
+        }
+
+        const response = await fetch(`https://secure.geonames.org/searchJSON?${query}&maxRows=10&username=${geonamesUsername}`);
+        const data = await response.json();
+        console.log("GeoNames Initial Geocoding data:", data);
+
+        if (data.totalResultsCount === 0 || data.geonames.length === 0) {
+            alert('Location not found. Please try a different city or state.');
+            return;
+        }
+
+        const geonamesResults = data.geonames;
+
+        if (geonamesResults.length === 1) {
+            const geoData = geonamesResults[0];
+            const lat = parseFloat(geoData.lat);
+            const lon = parseFloat(geoData.lng);
+            const standardizedCity = geoData.name || city || "Unknown City";
+            const standardizedState = geoData.adminName1 || state || "";
+            const standardizedZip = (geoData.postalCodes && geoData.postalCodes.length > 0) ? geoData.postalCodes[0].postalCode : zip || "";
+            const country = geoData.countryName || "Unknown Country";
+
+            console.log(`Initial Geocoding Result: City: ${standardizedCity}, State: ${standardizedState}, ZIP: ${standardizedZip}, Country: ${country}, Coordinates: (${lat}, ${lon})`);
+
+            // Always show confirmation modal to confirm or edit details
+            showConfirmationModal(lat, lon, standardizedCity, standardizedState, standardizedZip, country);
+        } else {
+            // Multiple results, show options
+            geonamesResultsGlobal = geonamesResults; // Store globally for access in event handlers
+            showConfirmationModal(null, null, null, null, null, null, true);
+        }
+    } catch (error) {
+        console.error('Error fetching coordinates from GeoNames:', error);
+        alert('Failed to fetch location coordinates. Please try again.');
+    }
+});
+
+        // Add Location Function
+        function addLocation(lat, lon, city, state, zip, country) {
+    console.log(`Adding location: ${city}, ${state}, ${zip}, ${country} at (${lat}, ${lon})`);
+
+    // Standardize country names to prevent duplicates
+    country = standardizeCountryName(country);
+
+    // Create a unique key for the location
+    const locationKey = `${lat},${lon}_${city.toLowerCase()}_${state.toLowerCase()}`;
+
+    // Check if the location already exists
+    const existingLocation = allData.find(loc => 
+        loc.lat === lat && 
+        loc.lon === lon && 
+        loc.city.toLowerCase() === city.toLowerCase() && 
+        loc.state.toLowerCase() === state.toLowerCase()
+    );
+    let newLocation = null;
+
+    if (existingLocation) {
+        existingLocation.visitCount += 1;
+        console.log("Existing location found. Incrementing visit count.");
+
+        // Update the corresponding marker's popup
+        const marker = markerMap.get(locationKey);
+        if (marker) {
+            const updatedPopupContent = `
+                <strong>${existingLocation.city}</strong>${(existingLocation.state) ? ', ' + existingLocation.state : ''}<br>
+                Visits: ${existingLocation.visitCount}<br>
+                <button class="btn btn-xs btn-danger" onclick="deleteLocation('${locationKey}')">Delete</button>
+            `;
+            marker.setPopupContent(updatedPopupContent);
+            console.log(`Marker popup updated for ${existingLocation.city}`);
+        } else {
+            console.warn(`Marker not found for existing location: ${existingLocation.city}`);
+        }
+    } else {
+        newLocation = {
+            lat,
+            lon,
+            city,
+            state: state || '', // Only record state if available
+            zip,
+            country,
+            visitCount: 1,
+            livedIn: false
+        };
+        allData.push(newLocation);
+        console.log("New location added.");
+
+        // Add a new marker for the new location
+        const popupText = `${city}${(state) ? ', ' + state : ''}${(country) ? ', ' + country : ''}`;
+        addMarker(lat, lon, popupText, newLocation);
+    }
+
+    // Save updated data to Firestore
+    saveData();
+
+    // Recreate Sets
+    const visitedStates = new Set();
+    const visitedCities = new Set();
+    const visitedCountries = new Set();
+    const visitedZipCodes = new Set();
+
+    allData.forEach(location => {
+        if (location.state && location.country.toLowerCase() === 'united states') {
+        visitedStates.add(location.state);
+    }
+        if (location.city) visitedCities.add(location.city);
+        if (location.country) visitedCountries.add(location.country);
+        if (location.zip) visitedZipCodes.add(location.zip);
+    });
+
+    // Update visualizations
+    updateChart(visitedCountries, visitedStates, visitedCities, visitedZipCodes);
+    updateStatesTable(visitedStates);
+    updateCitiesTable(visitedCities);
+    updateCountriesTable(visitedCountries);
+    updateZipCodesTable(visitedZipCodes);
+
+    // Update heatmap data
+    updateHeatmap();
+}
+
+
+        // Handle Confirmation Modal Submission
+        document.getElementById('confirmation-form').addEventListener('submit', async function(event) {
+    event.preventDefault();
+    const confirmedCity = document.getElementById('confirm-city').value.trim();
+    const confirmedState = document.getElementById('confirm-state').value.trim();
+    const confirmedZip = document.getElementById('confirm-zip').value.trim();
+    const confirmedCountry = document.getElementById('confirm-country').value.trim();
+    const lat = parseFloat(document.getElementById('confirm-lat').value);
+    const lon = parseFloat(document.getElementById('confirm-lon').value);
+
+    if (!confirmedCity) {
+        alert('City is required.');
+        return;
+    }
+
+    // If the state field is visible and required, ensure state is provided
+    if (confirmStateGroup.style.display !== 'none' && !confirmedState) {
+        alert('State is required for this location.');
+        return;
+    }
+
+    // Hide the modal
+    confirmationModal.modal('hide');
+
+    // Add the location
+    addLocation(lat, lon, confirmedCity, confirmedState, confirmedZip, confirmedCountry);
+});
+
+        // Make deleteLocation accessible globally
+        window.deleteLocation = deleteLocation;
+
+        // Function to standardize country names
+        function standardizeCountryName(country) {
+    const countryMap = {
+        'usa': 'United States',
+        'us': 'United States',
+        'u.s.a.': 'United States',
+        'u.s.': 'United States',
+        'uk': 'United Kingdom',
+        'gb': 'United Kingdom',
+        'great britain': 'United Kingdom',
+        // Add more mappings as needed
+    };
+
+    const lowerCountry = country.toLowerCase();
+    return countryMap[lowerCountry] || country;
+}
+
+        // Add Marker to Map
+        function addMarker(lat, lon, popupText, location) {
+    if (!map || !heatmapLayer) return;
+
+    // Create a unique key for the location
+    const locationKey = `${lat},${lon}_${location.city.toLowerCase()}_${location.state.toLowerCase()}`;
+
+    // Define the popup content with a Delete button
+    const popupContent = `
+        <strong>${popupText}</strong><br>
+        Visits: ${location.visitCount}<br>
+        <button class="btn btn-xs btn-danger" onclick="deleteLocation('${locationKey}')">Delete</button>
+    `;
+
+    const marker = L.marker([lat, lon]).addTo(map)
+        .bindPopup(popupContent);
+    markers.push(marker);
+    console.log("Marker added to map:", popupText);
+
+    // Store the marker in the markerMap
+    markerMap.set(locationKey, marker);
+}
+
+        // Delete Location Function
+        async function deleteLocation(locationKey) {
+            console.log(`Deleting location with key: ${locationKey}`);
+
+            // Confirm deletion
+            if (!confirm("Are you sure you want to delete this location?")) {
+                return;
+            }
+
+            // Retrieve the marker from the markerMap
+            const marker = markerMap.get(locationKey);
+            if (marker) {
+                // Remove marker from the map
+                map.removeLayer(marker);
+                markerMap.delete(locationKey);
+                console.log("Marker removed from map.");
+            } else {
+                console.warn("Marker not found for the given location key.");
+            }
+
+            // Parse the locationKey to extract lat, lon, city, and state
+            const [latLon, city, state] = locationKey.split('_');
+            const [lat, lon] = latLon.split(',').map(coord => parseFloat(coord));
+
+            // Find the location in allData
+            const locationIndex = allData.findIndex(loc => 
+                loc.lat === lat && 
+                loc.lon === lon && 
+                loc.city.toLowerCase() === city.toLowerCase() && 
+                loc.state.toLowerCase() === state.toLowerCase()
+            );
+
+            if (locationIndex !== -1) {
+                // Remove the location from allData
+                allData.splice(locationIndex, 1);
+                console.log("Location removed from allData.");
+            } else {
+                console.warn("Location not found in allData.");
+            }
+
+            // Save the updated data to Firestore
+            await saveData();
+
+            // Update visualizations
+            const visitedStates = new Set();
+            const visitedCities = new Set();
+            const visitedCountries = new Set();
+            const visitedZipCodes = new Set();
+
+            allData.forEach(location => {
+                if (location.state && location.country.toLowerCase() === 'united states') {
+        visitedStates.add(location.state);
+    }
+                if (location.city) visitedCities.add(location.city);
+                if (location.country) visitedCountries.add(location.country);
+                if (location.zip) visitedZipCodes.add(location.zip);
+            });
+
+            updateChart(visitedCountries, visitedStates, visitedCities, visitedZipCodes);
+            updateStatesTable(visitedStates);
+            updateCitiesTable(visitedCities);
+            updateCountriesTable(visitedCountries);
+            updateZipCodesTable(visitedZipCodes);
+
+            // Update heatmap data
+            updateHeatmap();
+
+            alert("Location deleted successfully.");
+        }
+
+        // Update Heatmap
+        function updateHeatmap() {
+            if (!heatmapLayer) return;
+
+            const heatData = allData.map(location => [location.lat, location.lon, location.visitCount]);
+            heatmapLayer.setLatLngs(heatData);
+            console.log("Heatmap updated:", heatData.length, "points.");
+        }
+
+        // Update Chart using D3.js
+        function updateChart(visitedCountries, visitedStates, visitedCities, visitedZipCodes) {
+            console.log('Updating chart.');
+
+            // Clear previous chart
+            d3.select('#chart').html('');
+
+            // Data for the chart
+            const data = [
+                { label: 'Countries', value: visitedCountries.size },
+                { label: 'States', value: visitedStates.size },
+                { label: 'Cities', value: visitedCities.size },
+                { label: 'ZIP Codes', value: visitedZipCodes.size }
+            ];
+
+            console.log('Chart Data:', data);
+
+            const width = 700; // Adjust as needed
+            const height = 500; // Adjust as needed
+            const margin = { top: 60, right: 40, bottom: 60, left: 80 };
+
+            const svg = d3.select('#chart')
+                .append('svg')
+                .attr('width', width)
+                .attr('height', height);
+
+            const x = d3.scaleBand()
+                .domain(data.map(d => d.label))
+                .range([margin.left, width - margin.right])
+                .padding(0.2);
+
+            const y = d3.scaleLinear()
+                .domain([0, d3.max(data, d => d.value) + 2]) // Added padding
+                .nice()
+                .range([height - margin.bottom, margin.top]);
+
+            const xAxis = g => g
+                .attr('transform', `translate(0, ${height - margin.bottom})`)
+                .call(d3.axisBottom(x))
+                .selectAll("text")	
+                    .style("text-anchor", "middle");
+
+            const yAxis = g => g
+                .attr('transform', `translate(${margin.left}, 0)`)
+                .call(d3.axisLeft(y).ticks(null, "s"));
+
+            svg.append('g').call(yAxis);
+            svg.append('g').call(xAxis);
+
+            // Create the bars
+            svg.append('g')
+                .selectAll('rect')
+                .data(data)
+                .join('rect')
+                .attr('x', d => x(d.label))
+                .attr('y', d => y(d.value))
+                .attr('height', d => y(0) - y(d.value))
+                .attr('width', x.bandwidth())
+                .attr('fill', '#1f77b4')
+                .attr('opacity', 0.7)
+                .on('mouseover', function(event, d) {
+                    d3.select(this).attr('opacity', 1);
+                })
+                .on('mouseout', function(event, d) {
+                    d3.select(this).attr('opacity', 0.7);
+                });
+
+            // Add labels on top of the bars
+            svg.append('g')
+                .selectAll('text.label')
+                .data(data)
+                .enter()
+                .append('text')
+                .attr('class', 'label')
+                .attr('x', d => x(d.label) + x.bandwidth() / 2)
+                .attr('y', d => y(d.value) - 10) // Positioned 10px above the bar
+                .attr('text-anchor', 'middle')
+                .attr('font-size', '14px')
+                .attr('fill', '#000')
+                .text(d => d.value > 0 ? d.value : '');
+
+            // Add chart title
+            svg.append('text')
+                .attr('x', width / 2)
+                .attr('y', margin.top / 2)
+                .attr('text-anchor', 'middle')
+                .attr('font-size', '28px')
+                .attr('font-weight', 'bold')
+                .text('Places Visited');
+            
+            // Add Y-axis label
+            svg.append("text")
+                .attr("transform", "rotate(-90)")
+                .attr("y", margin.left / 4)
+                .attr("x", -height / 2)
+                .attr("dy", "-2.5em")
+                .attr("text-anchor", "middle")
+                .attr("font-size", "16px")
+                .text("Number of Places");
+            
+            // Add X-axis label
+            svg.append("text")
+                .attr("x", width / 2)
+                .attr("y", height - margin.bottom / 4)
+                .attr("text-anchor", "middle")
+                .attr("font-size", "16px")
+                .text("Category");
+
+            console.log("Chart updated.");
+        }
+
+        // Update States Table
+        function updateStatesTable(visitedStates) {
+    console.log("Updating States Table.");
+
+    // Clear previous table
+    d3.select('#statesTable').html('');
+
+    // Convert visitedStates to an array of unique states with visit counts
+    const data = Array.from(visitedStates).map(stateName => {
+        // Find all locations that match the state and are in the US
+        const locations = allData.filter(d => 
+            d.state.toLowerCase() === stateName.toLowerCase() && 
+            d.country.toLowerCase() === 'united states'
+        );
+        // Calculate total visit count for the state
+        const totalVisits = locations.reduce((sum, loc) => sum + loc.visitCount, 0);
+        return {
+            state: stateName,
+            visitCount: totalVisits
+        };
+    });
+
+    // Remove any states with zero visits (in case any slipped through)
+    const filteredData = data.filter(d => d.visitCount > 0);
+
+    // Sort data alphabetically by state name
+    filteredData.sort((a, b) => a.state.localeCompare(b.state));
+
+    console.log('States Data:', filteredData);
+
+    // Create the table element
+    const table = d3.select('#statesTable').append('table').attr('class', 'table table-striped table-bordered');
+    const thead = table.append('thead');
+    const tbody = table.append('tbody');
+    const tfoot = table.append('tfoot');
+
+    // Define table headers
+    const headers = ['State', 'Visit Count'];
+
+    // Append headers to the thead
+    thead.append('tr')
+        .selectAll('th')
+        .data(headers)
+        .enter()
+        .append('th')
+        .text(d => d)
+        .style('cursor', 'pointer');
+
+    // Append rows to the tbody
+    const rows = tbody.selectAll('tr')
+        .data(filteredData)
+        .enter()
+        .append('tr');
+
+    // Append cells to each row
+    rows.selectAll('td')
+        .data(d => [d.state, d.visitCount])
+        .enter()
+        .append('td')
+        .text(d => d);
+
+    // Calculate Running Total as the number of unique states
+    const runningTotal = filteredData.length;
+    console.log('Running Total (States):', runningTotal);
+
+    // Append a footer row with the running total
+    tfoot.append('tr')
+        .selectAll('td')
+        .data(['Total', runningTotal])
+        .enter()
+        .append('td')
+        .attr('colspan', '2') // Span across two columns
+        .attr('style', 'font-weight: bold; text-align: right; background-color: #f2f2f2;')
+        .text(d => d);
+}
+
+        // Update Cities Table
+        function updateCitiesTable(visitedCities) {
+            console.log("Updating Cities Table.");
+
+            // Clear previous table
+            d3.select('#citiesTable').html('');
+
+            // Convert visitedCities to an array of unique cities with visit counts
+            const data = Array.from(visitedCities).map(cityName => {
+                // Find all locations that match the city
+                const locations = allData.filter(d => d.city.toLowerCase() === cityName.toLowerCase());
+                // Calculate total visit count for the city
+                const totalVisits = locations.reduce((sum, loc) => sum + loc.visitCount, 0);
+                // Check if any of the locations are marked as lived in
+                const livedIn = locations.some(loc => loc.livedIn);
+                return {
+                    city: cityName,
+                    state: Array.from(new Set(locations.map(loc => loc.state))).join(', '),
+                    livedIn: livedIn ? 'Yes' : 'No',
+                    visitCount: totalVisits
+                };
+            });
+
+            // Sort data alphabetically by city name
+            data.sort((a, b) => a.city.localeCompare(b.city));
+
+            console.log('Cities Data:', data);
+
+            // Create the table element
+            const table = d3.select('#citiesTable').append('table').attr('class', 'table table-striped table-bordered');
+            const thead = table.append('thead');
+            const tbody = table.append('tbody');
+            const tfoot = table.append('tfoot');
+
+            // Define table headers
+            const headers = ['City', 'State', 'Lived In', 'Visit Count'];
+
+            // Append headers to the thead
+            thead.append('tr')
+                .selectAll('th')
+                .data(headers)
+                .enter()
+                .append('th')
+                .text(d => d)
+                .style('cursor', 'pointer') // Optional
+                .on('click', function(event, d) {
+                    // Optional: Implement sorting functionality
+                });
+
+            // Append rows to the tbody
+            const rows = tbody.selectAll('tr')
+                .data(data)
+                .enter()
+                .append('tr');
+
+            // Append cells to each row
+            rows.selectAll('td')
+                .data(d => [d.city, d.state, d.livedIn, d.visitCount])
+                .enter()
+                .append('td')
+                .text(d => d);
+
+            // Calculate Running Total as the number of unique cities
+            const runningTotal = data.length;
+            console.log('Running Total (Cities):', runningTotal);
+
+            // Append a footer row with the running total
+            tfoot.append('tr')
+                .selectAll('td')
+                .data(['Total', '', '', runningTotal]) // Empty strings for alignment
+                .enter()
+                .append('td')
+                .attr('colspan', '4') // Span across four columns for proper alignment
+                .attr('style', 'font-weight: bold; text-align: right; background-color: #f2f2f2;')
+                .text(d => d);
+        }
+
+        // Update Countries Table
+        function updateCountriesTable(visitedCountries) {
+            console.log("Updating Countries Table.");
+
+            // Clear previous table
+            d3.select('#countriesTable').html('');
+
+            // Convert visitedCountries to an array of unique countries with visit counts
+            const data = Array.from(visitedCountries).map(countryName => {
+                // Find all locations that match the country
+                const locations = allData.filter(d => d.country.toLowerCase() === countryName.toLowerCase());
+                // Calculate total visit count for the country
+                const totalVisits = locations.reduce((sum, loc) => sum + loc.visitCount, 0);
+                return {
+                    country: countryName,
+                    visitCount: totalVisits
+                };
+            });
+
+            // Sort data alphabetically by country name
+            data.sort((a, b) => a.country.localeCompare(b.country));
+
+            console.log('Countries Data:', data);
+
+            // Create the table element
+            const table = d3.select('#countriesTable').append('table').attr('class', 'table table-striped table-bordered');
+            const thead = table.append('thead');
+            const tbody = table.append('tbody');
+            const tfoot = table.append('tfoot');
+
+            // Define table headers
+            const headers = ['Country', 'Visit Count'];
+
+            // Append headers to the thead
+            thead.append('tr')
+                .selectAll('th')
+                .data(headers)
+                .enter()
+                .append('th')
+                .text(d => d)
+                .style('cursor', 'pointer') // Optional
+                .on('click', function(event, d) {
+                    // Optional: Implement sorting functionality
+                });
+
+            // Append rows to the tbody
+            const rows = tbody.selectAll('tr')
+                .data(data)
+                .enter()
+                .append('tr');
+
+            // Append cells to each row
+            rows.selectAll('td')
+                .data(d => [d.country, d.visitCount])
+                .enter()
+                .append('td')
+                .text(d => d);
+
+            // Calculate Running Total as the number of unique countries
+            const runningTotal = data.length;
+            console.log('Running Total (Countries):', runningTotal);
+
+            // Append a footer row with the running total
+            tfoot.append('tr')
+                .selectAll('td')
+                .data(['Total', runningTotal])
+                .enter()
+                .append('td')
+                .attr('colspan', '2') // Span across two columns for proper alignment
+                .attr('style', 'font-weight: bold; text-align: right; background-color: #f2f2f2;')
+                .text(d => d);
+        }
+
+        // Update ZIP Codes Table
+        function updateZipCodesTable(visitedZipCodes) {
+            console.log("Updating ZIP Codes Table.");
+
+            // Clear previous table
+            d3.select('#zipCodesTable').html('');
+
+            // Convert visitedZipCodes to an array of unique ZIP codes with visit counts
+            const data = Array.from(visitedZipCodes).map(zipCode => {
+                // Find all locations that match the ZIP code
+                const locations = allData.filter(d => d.zip === zipCode);
+                // Calculate total visit count for the ZIP code
+                const totalVisits = locations.reduce((sum, loc) => sum + loc.visitCount, 0);
+                return {
+                    zipCode: zipCode,
+                    visitCount: totalVisits
+                };
+            });
+
+            // Sort data numerically by ZIP code
+            data.sort((a, b) => a.zipCode.localeCompare(b.zipCode));
+            // Alternatively, for numerical sorting:
+            // data.sort((a, b) => parseInt(a.zipCode) - parseInt(b.zipCode));
+
+            console.log('ZIP Codes Data:', data);
+
+            // Create the table element
+            const table = d3.select('#zipCodesTable').append('table').attr('class', 'table table-striped table-bordered');
+            const thead = table.append('thead');
+            const tbody = table.append('tbody');
+            const tfoot = table.append('tfoot');
+
+            // Define table headers
+            const headers = ['ZIP Code', 'Visit Count'];
+
+            // Append headers to the thead
+            thead.append('tr')
+                .selectAll('th')
+                .data(headers)
+                .enter()
+                .append('th')
+                .text(d => d)
+                .style('cursor', 'pointer') // Optional
+                .on('click', function(event, d) {
+                    // Optional: Implement sorting functionality
+                });
+
+            // Append rows to the tbody
+            const rows = tbody.selectAll('tr')
+                .data(data)
+                .enter()
+                .append('tr');
+
+            // Append cells to each row
+            rows.selectAll('td')
+                .data(d => [d.zipCode, d.visitCount])
+                .enter()
+                .append('td')
+                .text(d => d);
+
+            // Calculate Running Total as the number of unique ZIP codes
+            const runningTotal = data.length;
+            console.log('Running Total (ZIP Codes):', runningTotal);
+
+            // Append a footer row with the running total
+            tfoot.append('tr')
+                .selectAll('td')
+                .data(['Total', runningTotal])
+                .enter()
+                .append('td')
+                .attr('colspan', '2') // Span across two columns for proper alignment
+                .attr('style', 'font-weight: bold; text-align: right; background-color: #f2f2f2;')
+                .text(d => d);
+        }
+
+        // Clear All Data from UI (when user logs out)
+        function clearAllData() {
+            console.log("Clearing all data from UI.");
+            allData = [];
+
+            // Clear heatmap data
+            if (heatmapLayer) {
+                heatmapLayer.setLatLngs([]);
+                console.log("Heatmap data cleared.");
+            }
+
+            // Clear markers
+            markers.forEach(marker => {
+                map.removeLayer(marker);
+            });
+            markers = [];
+            markerMap.clear();
+            console.log("All map markers removed.");
+
+            // Clear tables and chart
+            d3.select('#statesTable').html('');
+            d3.select('#citiesTable').html('');
+            d3.select('#countriesTable').html('');
+            d3.select('#zipCodesTable').html('');
+            d3.select('#chart').html('');
+            console.log("Tables and chart cleared.");
+        }
+
+        // Reset All Data Function
+        resetButton.addEventListener('click', () => {
+            console.log("Reset button clicked.");
+            if (confirm("Are you sure you want to reset all your data? This action cannot be undone.")) {
+                allData = [];
+                saveData(); // Save the cleared data to Firestore
+                clearAllData();
+                alert("All data has been reset.");
+                console.log("All data reset.");
+            }
+        });
+
+        // Handle Confirmation Modal Submission
+        // (Already handled above; this redundant block has been removed)
+
+        // Make deleteLocation accessible globally
+        window.deleteLocation = deleteLocation;
+    </script>
+    <!-- jQuery (required for Bootstrap 3) -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <!-- Bootstrap JS -->
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
-    <!-- Custom JS -->
-    <script src="app.js"></script>
-
+    <!-- D3.js -->
+    <script src="https://d3js.org/d3.v6.min.js"></script>
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <!-- Leaflet.heat Plugin -->
+    <script src="https://unpkg.com/leaflet.heat/dist/leaflet-heat.js"></script>
 </body>
 </html>
