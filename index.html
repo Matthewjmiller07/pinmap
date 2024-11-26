@@ -537,7 +537,7 @@ function populateModalFields(geoData) {
             query = `adminName1=${encodeURIComponent(state)}`;
         }
 
-        const response = await fetch(`https://secure.geonames.org/searchJSON?${query}&maxRows=10&username=${geonamesUsername}`);
+        const response = await fetch(`https://secure.geonames.org/searchJSON?${query}&maxRows=20&username=${geonamesUsername}`);
         const data = await response.json();
         console.log("GeoNames Initial Geocoding data:", data);
 
