@@ -716,6 +716,7 @@ function populateModalFields(geoData) {
     const popupContent = `
         <strong>${popupText}</strong><br>
         Visits: ${location.visitCount}<br>
+        Lived In: ${location.livedIn ? 'Yes' : 'No'}<br>
         <button class="btn btn-xs btn-danger" onclick="deleteLocation('${locationKey}')">Delete</button>
     `;
 
@@ -726,6 +727,53 @@ function populateModalFields(geoData) {
 
     // Store the marker in the markerMap
     markerMap.set(locationKey, marker);
+
+    // Store the location data with the marker
+    marker.locationData = location;
+}
+
+function refreshMarkers() {
+    markers.forEach(marker => {
+        const loc = marker.locationData;
+        const popupText = `${loc.city}${(loc.state) ? ', ' + loc.state : ''}${(loc.country) ? ', ' + loc.country : ''}`;
+        const popupContent = `
+            <strong>${popupText}</strong><br>
+            Visits: ${loc.visitCount}<br>
+            Lived In: ${loc.livedIn ? 'Yes' : 'No'}<br>
+            <button class="btn btn-xs btn-danger" onclick="deleteLocation('${loc.lat},${loc.lon}_${loc.city.toLowerCase()}_${loc.state.toLowerCase()}')">Delete</button>
+        `;
+        marker.setPopupContent(popupContent);
+    });
+}
+function refreshVisualizations() {
+    // Update markers
+    refreshMarkers();
+
+    // Other updates...
+    // Rebuild the sets
+    const visitedStates = new Set();
+    const visitedCities = new Set();
+    const visitedCountries = new Set();
+    const visitedZipCodes = new Set();
+
+    allData.forEach(location => {
+        if (location.state && location.country.toLowerCase() === 'united states') {
+            visitedStates.add(location.state);
+        }
+        if (location.city) visitedCities.add(location.city);
+        if (location.country) visitedCountries.add(location.country);
+        if (location.zip) visitedZipCodes.add(location.zip);
+    });
+
+    // Update visualizations
+    updateChart(visitedCountries, visitedStates, visitedCities, visitedZipCodes);
+    updateStatesTable(visitedStates);
+    updateCitiesTable(visitedCities);
+    updateCountriesTable(visitedCountries);
+    updateZipCodesTable(visitedZipCodes);
+
+    // Update heatmap data
+    updateHeatmap();
 }
 
         // Delete Location Function
@@ -800,12 +848,12 @@ function populateModalFields(geoData) {
 
         // Update Heatmap
         function updateHeatmap() {
-            if (!heatmapLayer) return;
+    if (!heatmapLayer) return;
 
-            const heatData = allData.map(location => [location.lat, location.lon, location.visitCount]);
-            heatmapLayer.setLatLngs(heatData);
-            console.log("Heatmap updated:", heatData.length, "points.");
-        }
+    const heatData = allData.map(location => [location.lat, location.lon, location.visitCount]);
+    heatmapLayer.setLatLngs(heatData);
+    console.log("Heatmap updated:", heatData.length, "points.");
+}
 
         // Update Chart using D3.js
         function updateChart(visitedCountries, visitedStates, visitedCities, visitedZipCodes) {
@@ -996,80 +1044,182 @@ function populateModalFields(geoData) {
 
         // Update Cities Table
         function updateCitiesTable(visitedCities) {
-            console.log("Updating Cities Table.");
+    console.log("Updating Cities Table.");
 
-            // Clear previous table
-            d3.select('#citiesTable').html('');
+    // Clear previous table
+    d3.select('#citiesTable').html('');
 
-            // Convert visitedCities to an array of unique cities with visit counts
-            const data = Array.from(visitedCities).map(cityName => {
-                // Find all locations that match the city
-                const locations = allData.filter(d => d.city.toLowerCase() === cityName.toLowerCase());
-                // Calculate total visit count for the city
-                const totalVisits = locations.reduce((sum, loc) => sum + loc.visitCount, 0);
-                // Check if any of the locations are marked as lived in
-                const livedIn = locations.some(loc => loc.livedIn);
-                return {
-                    city: cityName,
-                    state: Array.from(new Set(locations.map(loc => loc.state))).join(', '),
-                    livedIn: livedIn ? 'Yes' : 'No',
-                    visitCount: totalVisits
-                };
+    // Convert visitedCities to an array of unique cities with visit counts
+    const data = Array.from(visitedCities).map(cityName => {
+        // Find all locations that match the city
+        const locations = allData.filter(d => d.city.toLowerCase() === cityName.toLowerCase());
+        // Calculate total visit count for the city
+        const totalVisits = locations.reduce((sum, loc) => sum + loc.visitCount, 0);
+        // Check if any of the locations are marked as lived in
+        const livedIn = locations.some(loc => loc.livedIn);
+        return {
+            city: cityName,
+            state: Array.from(new Set(locations.map(loc => loc.state))).join(', '),
+            livedIn: livedIn,
+            visitCount: totalVisits
+        };
+    });
+
+    // Sort data alphabetically by city name
+    data.sort((a, b) => a.city.localeCompare(b.city));
+
+    console.log('Cities Data:', data);
+
+    // Create the table element
+    const table = d3.select('#citiesTable').append('table').attr('class', 'table table-striped table-bordered');
+    const thead = table.append('thead');
+    const tbody = table.append('tbody');
+    const tfoot = table.append('tfoot');
+
+    // Define table headers
+    const headers = ['City', 'State', 'Lived In', 'Visit Count', 'Actions'];
+
+    // Append headers to the thead
+    thead.append('tr')
+        .selectAll('th')
+        .data(headers)
+        .enter()
+        .append('th')
+        .text(d => d);
+
+    // Append rows to the tbody
+    const rows = tbody.selectAll('tr')
+        .data(data)
+        .enter()
+        .append('tr');
+
+    // Append cells to each row
+    rows.each(function(d) {
+        const row = d3.select(this);
+        row.append('td').text(d.city);
+        row.append('td').text(d.state);
+
+        // Editable 'Lived In' checkbox
+        row.append('td')
+            .append('input')
+            .attr('type', 'checkbox')
+            .property('checked', d.livedIn)
+            .on('change', function(event) {
+                const isChecked = this.checked;
+                updateLivedInStatusForCity(d.city, isChecked);
             });
 
-            // Sort data alphabetically by city name
-            data.sort((a, b) => a.city.localeCompare(b.city));
+        // Editable visit count cell
+        row.append('td')
+            .append('input')
+            .attr('type', 'number')
+            .attr('min', 1)
+            .attr('value', d.visitCount)
+            .attr('style', 'width: 80px;')
+            .on('change', function(event) {
+                const newVisitCount = parseInt(this.value);
+                if (newVisitCount > 0) {
+                    updateVisitCountForCity(d.city, newVisitCount);
+                } else {
+                    alert('Visit count must be at least 1.');
+                    this.value = d.visitCount;
+                }
+            });
 
-            console.log('Cities Data:', data);
+        // Actions cell with Delete button
+        row.append('td')
+            .append('button')
+            .attr('class', 'btn btn-xs btn-danger')
+            .text('Delete')
+            .on('click', function() {
+                if (confirm(`Are you sure you want to delete all entries for city: ${d.city}?`)) {
+                    deleteCity(d.city);
+                }
+            });
+    });
 
-            // Create the table element
-            const table = d3.select('#citiesTable').append('table').attr('class', 'table table-striped table-bordered');
-            const thead = table.append('thead');
-            const tbody = table.append('tbody');
-            const tfoot = table.append('tfoot');
+    // Calculate Running Total as the number of unique cities
+    const runningTotal = data.length;
+    console.log('Running Total (Cities):', runningTotal);
 
-            // Define table headers
-            const headers = ['City', 'State', 'Lived In', 'Visit Count'];
+    // Append a footer row with the running total
+    tfoot.append('tr')
+        .append('td')
+        .attr('colspan', headers.length)
+        .attr('style', 'font-weight: bold; text-align: right;')
+        .text(`Total Cities: ${runningTotal}`);
+}
 
-            // Append headers to the thead
-            thead.append('tr')
-                .selectAll('th')
-                .data(headers)
-                .enter()
-                .append('th')
-                .text(d => d)
-                .style('cursor', 'pointer') // Optional
-                .on('click', function(event, d) {
-                    // Optional: Implement sorting functionality
-                });
+function updateLivedInStatusForCity(cityName, livedInStatus) {
+    // Find all locations matching the city
+    const locations = allData.filter(loc => loc.city.toLowerCase() === cityName.toLowerCase());
 
-            // Append rows to the tbody
-            const rows = tbody.selectAll('tr')
-                .data(data)
-                .enter()
-                .append('tr');
+    if (locations.length > 0) {
+        // Update the 'livedIn' status for each location
+        locations.forEach(loc => {
+            loc.livedIn = livedInStatus;
+        });
 
-            // Append cells to each row
-            rows.selectAll('td')
-                .data(d => [d.city, d.state, d.livedIn, d.visitCount])
-                .enter()
-                .append('td')
-                .text(d => d);
+        // Save updated data to Firestore
+        saveData();
 
-            // Calculate Running Total as the number of unique cities
-            const runningTotal = data.length;
-            console.log('Running Total (Cities):', runningTotal);
+        // Refresh visualizations if necessary
+        refreshVisualizations();
+    }
+}
 
-            // Append a footer row with the running total
-            tfoot.append('tr')
-                .selectAll('td')
-                .data(['Total', '', '', runningTotal]) // Empty strings for alignment
-                .enter()
-                .append('td')
-                .attr('colspan', '4') // Span across four columns for proper alignment
-                .attr('style', 'font-weight: bold; text-align: right; background-color: #f2f2f2;')
-                .text(d => d);
+function updateVisitCountForCity(cityName, newVisitCount) {
+    // Find all locations matching the city
+    const locations = allData.filter(loc => loc.city.toLowerCase() === cityName.toLowerCase());
+
+    // Calculate the current total visits for the city
+    const currentTotalVisits = locations.reduce((sum, loc) => sum + loc.visitCount, 0);
+
+    // Calculate the difference in visit counts
+    const visitDifference = newVisitCount - currentTotalVisits;
+
+    if (visitDifference !== 0) {
+        // Update each location's visit count proportionally
+        locations.forEach(loc => {
+            const locProportion = loc.visitCount / currentTotalVisits;
+            loc.visitCount += Math.round(visitDifference * locProportion);
+
+            // Ensure visit count is at least 1
+            if (loc.visitCount < 1) {
+                loc.visitCount = 1;
+            }
+        });
+
+        // Save updated data to Firestore
+        saveData();
+
+        // Refresh visualizations
+        refreshVisualizations();
+    }
+}
+
+function deleteCity(cityName) {
+    // Remove locations matching the city from allData
+    allData = allData.filter(loc => loc.city.toLowerCase() !== cityName.toLowerCase());
+
+    // Remove corresponding markers from the map
+    markers.forEach(marker => {
+        if (marker.locationData && marker.locationData.city.toLowerCase() === cityName.toLowerCase()) {
+            map.removeLayer(marker);
         }
+    });
+
+    // Remove markers from the markers array
+    markers = markers.filter(marker => !(marker.locationData && marker.locationData.city.toLowerCase() === cityName.toLowerCase()));
+
+    // Save updated data to Firestore
+    saveData();
+
+    // Refresh visualizations
+    refreshVisualizations();
+
+    alert(`City "${cityName}" has been deleted.`);
+}
 
         // Update Countries Table
         function updateCountriesTable(visitedCountries) {
