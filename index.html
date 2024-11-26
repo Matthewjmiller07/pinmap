@@ -1442,6 +1442,7 @@ const revokeShareButton = document.getElementById('revoke-share-button');
 let shareToken = null;
 
 // Event Listener for Share Button
+// Event Listener for Share Button
 shareButton.addEventListener('click', async () => {
   if (!currentUser) return;
 
@@ -1451,8 +1452,11 @@ shareButton.addEventListener('click', async () => {
     await saveSharedData(shareToken);
   }
 
-  // Display the shareable link
-  const link = `${window.location.origin}/shared.html?token=${shareToken}`;
+  // Get the base path up to the current directory
+  const basePath = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/'));
+
+  // Construct the correct shareable link
+  const link = `${window.location.origin}${basePath}/shared.html?token=${shareToken}`;
   shareableLinkInput.value = link;
   shareLinkDiv.style.display = 'block';
 });
