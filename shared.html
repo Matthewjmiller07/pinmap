@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <!-- Include necessary CSS and meta tags -->
+    <meta charset="UTF-8">
+    <title>Shared PinMap</title>
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
+    <!-- Leaflet CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    <!-- Custom CSS -->
+    <style>
+        #map {
+            height: 500px;
+            width: 100%;
+        }
+        /* Additional styles as needed */
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1 class="text-center">Shared PinMap</h1>
+        <!-- Map Section -->
+        <div id="map" style="margin-top: 20px;"></div>
+    </div>
+    <!-- Firebase SDKs and Application Scripts -->
+    <script type="module">
+        // Import Firebase modules
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
+        import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
+
+        // Firebase configuration
+        const firebaseConfig = {
+            apiKey: "AIzaSyCtGCpWEF0H3eNJ7hasrgQIiVsIjhbQMN8",
+            authDomain: "pinmap-31e5f.firebaseapp.com",
+            projectId: "pinmap-31e5f",
+            storageBucket: "pinmap-31e5f.firebasestorage.app",
+            messagingSenderId: "816721437507",
+            appId: "1:816721437507:web:90f786fb2b820d9247c5f6",
+            measurementId: "G-DYJHWZY7V6"
+        };
+
+        // Initialize Firebase
+        const app = initializeApp(firebaseConfig);
+        const db = getFirestore(app);
+
+        // Initialize Leaflet Map
+        let map = L.map('map').setView([20, 0], 2);
+
+        // Add OpenStreetMap tiles
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+            attribution: '&copy; OpenStreetMap contributors'
+        }).addTo(map);
+
+        // Get the share token from URL parameters
+        const urlParams = new URLSearchParams(window.location.search);
+        const shareToken = urlParams.get('token');
+
+        if (shareToken) {
+            loadSharedData(shareToken);
+        } else {
+            alert('No share token provided.');
+        }
+
+        // Function to load shared data
+        async function loadSharedData(token) {
+            try {
+                const docRef = doc(db, 'sharedData', token);
+                const docSnap = await getDoc(docRef);
+                if (docSnap.exists()) {
+                    const sharedData = docSnap.data().allData;
+                    displaySharedData(sharedData);
+                } else {
+                    alert('Shared data not found or has been revoked.');
+                }
+            } catch (error) {
+                console.error('Error loading shared data:', error);
+                alert('Failed to load shared data.');
+            }
+        }
+
+        // Function to display shared data on the map
+        function displaySharedData(data) {
+            data.forEach(location => {
+                const popupText = `${location.city}${(location.state) ? ', ' + location.state : ''}${(location.country) ? ', ' + location.country : ''}`;
+                L.marker([location.lat, location.lon]).addTo(map)
+                    .bindPopup(`
+                        <strong>${popupText}</strong><br>
+                        Visits: ${location.visitCount}<br>
+                        Lived In: ${location.livedIn ? 'Yes' : 'No'}
+                    `);
+            });
+        }
+    </script>
+    <!-- Include necessary JS libraries -->
+    <!-- jQuery -->
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>    
+    <!-- Bootstrap JS -->
+    <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
+    <!-- Leaflet JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+</body>
+</html>

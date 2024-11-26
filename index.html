@@ -78,6 +78,16 @@
             <button id="reset-button" class="btn btn-warning">Reset All Data</button>
         </div>
 
+        <!-- Share Data Button -->
+<div class="share-button text-center" style="margin-top: 20px;">
+    <button id="share-button" class="btn btn-info">Share My Map</button>
+    <div id="share-link" style="margin-top: 10px; display: none;">
+      <p>Your shareable link:</p>
+      <input type="text" id="shareable-link" class="form-control" readonly>
+      <button id="revoke-share-button" class="btn btn-warning" style="margin-top: 10px;">Revoke Sharing</button>
+    </div>
+  </div>
+
         <!-- Map Section -->
         <div id="map" style="margin-top: 20px; display: none;"></div>
 
@@ -149,7 +159,7 @@
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
         import { getAnalytics } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-analytics.js";
         import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-auth.js";
-        import { getFirestore, doc, setDoc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
+        import { getFirestore, doc, setDoc, getDoc, deleteDoc } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
         // Firebase configuration
         const firebaseConfig = {
@@ -1408,6 +1418,77 @@ function deleteCity(cityName) {
                 console.log("All data reset.");
             }
         });
+
+        // DOM Elements
+const shareButton = document.getElementById('share-button');
+const shareLinkDiv = document.getElementById('share-link');
+const shareableLinkInput = document.getElementById('shareable-link');
+const revokeShareButton = document.getElementById('revoke-share-button');
+
+// Application State
+let shareToken = null;
+
+// Event Listener for Share Button
+shareButton.addEventListener('click', async () => {
+  if (!currentUser) return;
+
+  // Generate a unique share token if it doesn't exist
+  if (!shareToken) {
+    shareToken = generateShareToken();
+    await saveSharedData(shareToken);
+  }
+
+  // Display the shareable link
+  const link = `${window.location.origin}/shared.html?token=${shareToken}`;
+  shareableLinkInput.value = link;
+  shareLinkDiv.style.display = 'block';
+});
+
+// Event Listener for Revoke Sharing Button
+revokeShareButton.addEventListener('click', async () => {
+  if (!currentUser || !shareToken) return;
+
+  // Delete shared data from Firestore
+  await deleteSharedData(shareToken);
+
+  // Reset shareToken and update UI
+  shareToken = null;
+  shareLinkDiv.style.display = 'none';
+});
+
+// Function to Generate a Unique Share Token
+function generateShareToken() {
+  // Use a combination of user ID and a timestamp or a random string
+  return currentUser.uid + '_' + Date.now();
+}
+
+// Function to Save Shared Data to Firestore
+async function saveSharedData(token) {
+  if (!currentUser) return;
+
+  try {
+    // Include ownerUid for security rules
+    await setDoc(doc(db, 'sharedData', token), { 
+      allData, 
+      ownerUid: currentUser.uid 
+    }, { merge: true });
+    console.log('Shared data saved successfully.');
+  } catch (error) {
+    console.error('Error saving shared data:', error);
+    alert('Failed to share your data. Please try again.');
+  }
+}
+
+// Function to Delete Shared Data from Firestore
+async function deleteSharedData(token) {
+  try {
+    await deleteDoc(doc(db, 'sharedData', token));
+    console.log('Shared data deleted successfully.');
+  } catch (error) {
+    console.error('Error deleting shared data:', error);
+    alert('Failed to revoke sharing. Please try again.');
+  }
+}
 
         // Handle Confirmation Modal Submission
         // (Already handled above; this redundant block has been removed)
