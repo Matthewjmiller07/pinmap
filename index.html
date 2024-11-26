@@ -348,54 +348,68 @@ function populateModalFields(geoData) {
 
         // Update UI Based on Authentication
         function updateUI(user) {
-            if (user) {
-                // User is signed in
-                currentUser = user;
-                loginButton.style.display = 'none';
-                logoutButton.style.display = 'inline-block';
-                userInfo.style.display = 'block';
-                userNameSpan.textContent = user.displayName || user.email;
+  if (user) {
+    // User is signed in
+    currentUser = user;
+    loginButton.style.display = 'none';
+    logoutButton.style.display = 'inline-block';
+    userInfo.style.display = 'block';
+    userNameSpan.textContent = user.displayName || user.email;
 
-                // Show application sections
-                addLocationForm.style.display = 'block';
-                mapContainer.style.display = 'block';
-                chartContainer.style.display = 'block';
-                tablesContainer.style.display = 'block';
-                resetButton.parentElement.style.display = 'block';
+    // Show application sections
+    addLocationForm.style.display = 'block';
+    mapContainer.style.display = 'block';
+    chartContainer.style.display = 'block';
+    tablesContainer.style.display = 'block';
+    resetButton.parentElement.style.display = 'block';
+    shareButton.style.display = 'block'; // Show share button when logged in
 
-                // Initialize map if not already initialized
-                if (!map) {
-                    initializeMap();
-                }
+    // Initialize map if not already initialized
+    if (!map) {
+      initializeMap();
+    }
 
-                // Load user data from Firestore
-                loadUserData();
-            } else {
-                // User is signed out
-                currentUser = null;
-                loginButton.style.display = 'inline-block';
-                logoutButton.style.display = 'none';
-                userInfo.style.display = 'none';
-
-                // Hide application sections
-                addLocationForm.style.display = 'none';
-                mapContainer.style.display = 'none';
-                chartContainer.style.display = 'none';
-                tablesContainer.style.display = 'none';
-                resetButton.parentElement.style.display = 'none';
-
-                // Clear map and heatmap
-                if (map) {
-                    map.remove();
-                    map = null;
-                    heatmapLayer = null;
-                    markers = [];
-                }
-
-                // Clear tables and chart
-                clearAllData();
-            }
+    // Load user data from Firestore
+    const localData = localStorage.getItem('allData');
+    if (localData) {
+      const parsedLocalData = JSON.parse(localData);
+      if (parsedLocalData.length > 0) {
+        if (confirm('Merge local data with your account?')) {
+          loadUserDataAndMerge(user.uid, parsedLocalData);
+        } else {
+          loadUserData(user.uid);
         }
+        localStorage.removeItem('allData');
+      } else {
+        loadUserData(user.uid);
+      }
+    } else {
+      loadUserData(user.uid);
+    }
+  } else {
+    // User is signed out
+    currentUser = null;
+    loginButton.style.display = 'inline-block';
+    logoutButton.style.display = 'none';
+    userInfo.style.display = 'none';
+
+    // Show application sections
+    addLocationForm.style.display = 'block'; // Show the form
+    mapContainer.style.display = 'block'; // Show the map
+    chartContainer.style.display = 'block';
+    tablesContainer.style.display = 'block';
+    resetButton.parentElement.style.display = 'block';
+    shareButton.style.display = 'none'; // Hide share button when not logged in
+
+    // Initialize map if not already initialized
+    if (!map) {
+      initializeMap();
+    }
+
+    // Load data from localStorage
+    loadLocalData();
+  }
+}
 
         // Authentication Event Listeners
         loginButton.addEventListener('click', () => {
@@ -425,9 +439,8 @@ function populateModalFields(geoData) {
 
         // Listen to Authentication State Changes
         onAuthStateChanged(auth, (user) => {
-            console.log("Authentication state changed:", user);
-            updateUI(user);
-        });
+  updateUI(user); // Update the UI based on auth state
+});
 
         // Firestore References
         function getUserDocRef(uid) {
