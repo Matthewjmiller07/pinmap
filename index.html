@@ -10,31 +10,79 @@
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
     <!-- Custom CSS -->
-    <style>
-        #map {
-            height: 500px;
-            width: 100%;
-        }
-        #chart {
-            width: 100%;
-            height: 500px;
-        }
-        /* Style for authentication buttons */
-        .auth-buttons {
-            margin-top: 20px;
-            margin-bottom: 20px;
-        }
-        /* Responsive adjustments */
-        @media (max-width: 768px) {
-            #map, #chart {
-                height: 300px;
-            }
-        }
-        /* Additional styling for reset button */
-        .reset-button {
-            margin-top: 20px;
-            margin-bottom: 20px;
-        }
+     <style>
+        /* Custom Styles */
+
+/* Container Styles */
+.container {
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 15px;
+}
+
+/* Map and Chart Styles */
+#map, #chart {
+    width: 100%;
+    height: 500px;
+    margin-bottom: 20px;
+    display: block; /* Ensure elements are block-level */
+    position: relative; /* Ensure proper positioning */
+}
+
+/* Responsive Adjustments */
+@media (max-width: 768px) {
+    #map{
+        height: 300px;
+    }
+
+    #chart {
+    width: 100%;
+    height: auto; /* Allow height to adjust based on content */
+    margin-bottom: 40px; /* Increase margin to separate from tables */
+    display: block;
+    position: relative;
+}
+}
+
+@media (max-width: 576px) {
+    #map {
+        height: 250px;
+    }
+
+    #chart {
+    width: 100%;
+    height: auto; /* Allow height to adjust based on content */
+    margin-bottom: 40px; /* Increase margin to separate from tables */
+    display: block;
+    position: relative;
+    }
+}
+
+/* Hide Elements by Default */
+.hidden {
+    display: none;
+}
+
+/* Margin Adjustments */
+.section {
+    margin-top: 20px;
+}
+
+/* Centering Text */
+.text-center {
+    text-align: center;
+}
+
+/* Additional Styles */
+.auth-buttons, .reset-button, .share-button {
+    margin: 20px auto;
+}
+
+/* Table Responsiveness */
+.table-responsive {
+    width: 100%;
+    overflow-x: auto;
+}
     </style>
     <!-- Favicon to prevent 404 error -->
     <link rel="icon" href="data:," />
@@ -46,16 +94,16 @@
         <!-- Authentication UI -->
         <div class="auth-buttons text-center">
             <button id="login-button" class="btn btn-primary">Login with Google</button>
-            <button id="logout-button" class="btn btn-danger" style="display: none;">Logout</button>
+            <button id="logout-button" class="btn btn-danger hidden">Logout</button>
         </div>
 
         <!-- User Info -->
-        <div id="user-info" class="text-center" style="display: none;">
+        <div id="user-info" class="text-center hidden">
             <p>Welcome, <span id="user-name"></span>!</p>
         </div>
 
         <!-- Add Location Form -->
-        <div id="add-location-form" style="display: none;">
+        <div id="add-location-form" class="section hidden">
             <form id="location-form">
                 <div class="form-group">
                     <label for="city">Enter City:</label>
@@ -74,84 +122,83 @@
         </div>
 
         <!-- Reset Button -->
-        <div class="reset-button text-center" style="display: none;">
+        <div class="reset-button text-center hidden">
             <button id="reset-button" class="btn btn-warning">Reset All Data</button>
         </div>
 
         <!-- Share Data Button -->
-<div class="share-button text-center" style="margin-top: 20px;">
-    <button id="share-button" class="btn btn-info">Share My Map</button>
-    <div id="share-link" style="margin-top: 10px; display: none;">
-      <p>Your shareable link:</p>
-      <input type="text" id="shareable-link" class="form-control" readonly>
-      <button id="revoke-share-button" class="btn btn-warning" style="margin-top: 10px;">Revoke Sharing</button>
-    </div>
-  </div>
+        <div class="share-button text-center hidden">
+            <button id="share-button" class="btn btn-info">Share My Map</button>
+            <div id="share-link" class="hidden">
+                <p>Your shareable link:</p>
+                <input type="text" id="shareable-link" class="form-control" readonly>
+                <button id="revoke-share-button" class="btn btn-warning" style="margin-top: 10px;">Revoke Sharing</button>
+            </div>
+        </div>
 
         <!-- Map Section -->
-        <div id="map" style="margin-top: 20px; display: none;"></div>
+        <div id="map" class="section hidden"></div>
 
         <!-- Chart Section -->
-        <div id="chart" class="text-center" style="margin-top: 20px; display: none;"></div>
+        <div id="chart" class="section hidden"></div>
 
         <!-- Tables Section -->
-        <div id="tables" style="margin-top: 20px; display: none;">
-            <h3>Visited States</h3>
+        <div id="tables" class="section hidden">
+            <h3 class="text-center">Visited States</h3>
             <div id="statesTable" class="table-responsive"></div>
-            <h3>Visited Cities</h3>
+            <h3 class="text-center">Visited Cities</h3>
             <div id="citiesTable" class="table-responsive"></div>
-            <h3>Visited Countries</h3>
+            <h3 class="text-center">Visited Countries</h3>
             <div id="countriesTable" class="table-responsive"></div>
-            <h3>Visited ZIP Codes</h3>
+            <h3 class="text-center">Visited ZIP Codes</h3>
             <div id="zipCodesTable" class="table-responsive"></div>
         </div>
     </div>
 
     <!-- Confirmation Modal -->
-    <!-- Confirmation Modal -->
-<div id="confirmationModal" class="modal fade" role="dialog">
-    <div class="modal-dialog">
-        <div class="modal-content">
-            <form id="confirmation-form">
-                <div class="modal-header">
-                    <button type="button" class="close" data-dismiss="modal">&times;</button>
-                    <h4 class="modal-title">Confirm Location Details</h4>
-                </div>
-                <div class="modal-body">
-                    <p>Please confirm or edit the location details:</p>
-                    <!-- Dropdown for multiple location options -->
-                    <div class="form-group" id="location-options-group" style="display:none;">
-                        <label for="location-options">Select a Location:</label>
-                        <select id="location-options" class="form-control"></select>
+    <div id="confirmationModal" class="modal fade" role="dialog">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <form id="confirmation-form">
+                    <div class="modal-header">
+                        <button type="button" class="close" data-dismiss="modal">&times;</button>
+                        <h4 class="modal-title">Confirm Location Details</h4>
                     </div>
-                    <div class="form-group">
-                        <label for="confirm-city">City:</label>
-                        <input type="text" id="confirm-city" class="form-control" required>
+                    <div class="modal-body">
+                        <p>Please confirm or edit the location details:</p>
+                        <!-- Dropdown for multiple location options -->
+                        <div class="form-group hidden" id="location-options-group">
+                            <label for="location-options">Select a Location:</label>
+                            <select id="location-options" class="form-control"></select>
+                        </div>
+                        <div class="form-group">
+                            <label for="confirm-city">City:</label>
+                            <input type="text" id="confirm-city" class="form-control" required>
+                        </div>
+                        <div class="form-group" id="confirm-state-group">
+                            <label for="confirm-state">State:</label>
+                            <input type="text" id="confirm-state" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="confirm-zip">ZIP Code:</label>
+                            <input type="text" id="confirm-zip" class="form-control">
+                        </div>
+                        <div class="form-group">
+                            <label for="confirm-country">Country:</label>
+                            <input type="text" id="confirm-country" class="form-control" readonly>
+                        </div>
+                        <!-- Hidden fields to store latitude and longitude -->
+                        <input type="hidden" id="confirm-lat">
+                        <input type="hidden" id="confirm-lon">
                     </div>
-                    <div class="form-group" id="confirm-state-group">
-                        <label for="confirm-state">State:</label>
-                        <input type="text" id="confirm-state" class="form-control">
+                    <div class="modal-footer">
+                        <button type="submit" class="btn btn-success">Confirm</button>
+                        <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
                     </div>
-                    <div class="form-group">
-                        <label for="confirm-zip">ZIP Code:</label>
-                        <input type="text" id="confirm-zip" class="form-control">
-                    </div>
-                    <div class="form-group">
-                        <label for="confirm-country">Country:</label>
-                        <input type="text" id="confirm-country" class="form-control" readonly>
-                    </div>
-                    <!-- Hidden fields to store latitude and longitude -->
-                    <input type="hidden" id="confirm-lat">
-                    <input type="hidden" id="confirm-lon">
-                </div>
-                <div class="modal-footer">
-                    <button type="submit" class="btn btn-success">Confirm</button>
-                    <button type="button" class="btn btn-default" data-dismiss="modal">Cancel</button>
-                </div>
-            </form>
+                </form>
+            </div>
         </div>
     </div>
-</div>
 
     <!-- Firebase SDKs and Application Scripts -->
     <script type="module">
@@ -353,16 +400,16 @@ function populateModalFields(geoData) {
     currentUser = user;
     loginButton.style.display = 'none';
     logoutButton.style.display = 'inline-block';
-    userInfo.style.display = 'block';
+    userInfo.classList.remove('hidden');
     userNameSpan.textContent = user.displayName || user.email;
 
     // Show application sections
-    addLocationForm.style.display = 'block';
-    mapContainer.style.display = 'block';
-    chartContainer.style.display = 'block';
-    tablesContainer.style.display = 'block';
-    resetButton.parentElement.style.display = 'block';
-    shareButton.style.display = 'block'; // Show share button when logged in
+    addLocationForm.classList.remove('hidden');
+    mapContainer.classList.remove('hidden');
+    chartContainer.classList.remove('hidden');
+    tablesContainer.classList.remove('hidden');
+    resetButton.parentElement.classList.remove('hidden');
+    shareButton.classList.remove('hidden');
 
     // Initialize map if not already initialized
     if (!map) {
@@ -391,15 +438,15 @@ function populateModalFields(geoData) {
     currentUser = null;
     loginButton.style.display = 'inline-block';
     logoutButton.style.display = 'none';
-    userInfo.style.display = 'none';
+    userInfo.classList.add('hidden');
 
-    // Show application sections
-    addLocationForm.style.display = 'block'; // Show the form
-    mapContainer.style.display = 'block'; // Show the map
-    chartContainer.style.display = 'block';
-    tablesContainer.style.display = 'block';
-    resetButton.parentElement.style.display = 'block';
-    shareButton.style.display = 'none'; // Hide share button when not logged in
+    // Show application sections for unauthenticated users
+    addLocationForm.classList.remove('hidden');
+    mapContainer.classList.remove('hidden');
+    chartContainer.classList.remove('hidden');
+    tablesContainer.classList.remove('hidden');
+    resetButton.parentElement.classList.remove('hidden');
+    shareButton.classList.add('hidden');
 
     // Initialize map if not already initialized
     if (!map) {
