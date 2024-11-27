@@ -55,34 +55,38 @@ h1 {
 }
 
 /* Map and Chart Styles */
-#map, #chart {
-    width: 100%; /* Ensure full width */
-    height: 400px; /* Default height */
+#map {
+    width: 100%; /* Use the full width of the container */
+    height: 400px; /* Set a fixed height for the map */
     margin: 40px 0; /* Add vertical spacing */
-    display: block;
-    position: relative;
-    border-radius: 8px; /* Rounded corners for visual appeal */
-    background: #ffffff;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    border-radius: 8px; /* Rounded corners */
+    background: #ffffff; /* Background color for container */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+    position: relative; /* Ensure internal positioning works correctly */
+    overflow: hidden; /* Clip any overflowing content */
 }
 
-/* Responsive Adjustments */
-@media (max-width: 768px) {
-    #map, #chart {
-        height: 400px; /* Increase height for better visibility */
-    }
+#chart {
+    width: 100%; /* Use the full width of the container */
+    max-width: 100%; /* Prevent it from exceeding its container */
+    height: auto; /* Ensure the height scales dynamically */
+    margin: 40px 0; /* Vertical spacing */
+    padding: 10px; /* Add internal spacing to prevent overlap with rounded edges */
+    border-radius: 8px; /* Rounded corners */
+    background: #ffffff; /* Background color for container */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Subtle shadow */
+    overflow: hidden; /* Clip any overflowing content */
+    position: relative; /* Ensure internal positioning works correctly */
 }
 
-@media (max-width: 576px) {
-    #map, #chart {
-        height: 350px; /* Further increase height for very small screens */
-    }
-}
 
 /* Ensure the chart spans the full width */
 #chart svg {
-    width: 100%; /* Ensure SVG stretches to container width */
+    display: block; /* Prevent inline SVG issues */
+    width: calc(100% - 20px); /* Ensure it stays within the container padding */
     height: auto; /* Maintain aspect ratio */
+    border-radius: inherit; /* Match parent container's rounded corners */
+    overflow: hidden; /* Clip content inside the SVG */
 }
 
 /* Section Spacing */
@@ -197,6 +201,20 @@ tfoot td {
     .table-responsive {
         max-height: 250px;
     }
+}
+
+#chart-wrapper {
+    width: 100%; /* Ensure it spans the full width of its container */
+    max-width: 1200px; /* Optional: Limit the width */
+    margin: 0 auto; /* Center it horizontally */
+    padding: 20px; /* Add some padding inside the wrapper */
+    border-radius: 8px; /* Match the rounded edges */
+    background: #ffffff; /* Same background as the chart container */
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1); /* Subtle shadow for distinction */
+    overflow: hidden; /* Prevent content from spilling out */
+    display: flex; /* Align child (#chart) properly */
+    justify-content: center;
+    align-items: center;
 }
     </style>
     <!-- Favicon to prevent 404 error -->
