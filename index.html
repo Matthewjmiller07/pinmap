@@ -1069,6 +1069,7 @@ function refreshVisualizations() {
 
     // Clear previous chart
     d3.select('#chart').html('');
+    console.log('Cleared existing chart content.');
 
     // Data for the chart
     const data = [
@@ -1080,15 +1081,27 @@ function refreshVisualizations() {
 
     console.log('Chart Data:', data);
 
+    // Check if there is any data to render
+    if (data.every(d => d.value === 0)) {
+        console.warn('No data available to render the chart.');
+        d3.select('#chart').append('p')
+            .text('No data to display')
+            .attr('style', 'text-align: center; color: gray; font-size: 16px; margin-top: 20px;');
+        return;
+    }
+
     // Dynamically calculate width based on the container
     const containerWidth = document.getElementById('chart').offsetWidth;
     const width = containerWidth; // Full width of the container
+    console.log('Container width:', containerWidth);
 
     // Adjust height dynamically for mobile
     const isMobile = window.innerWidth <= 576; // Mobile screen width
     const height = isMobile ? 350 : 500; // Set height based on device type
+    console.log('Chart height:', height);
 
     const margin = { top: 60, right: 40, bottom: 60, left: 80 };
+    console.log('Margins:', margin);
 
     const svg = d3.select('#chart')
         .append('svg')
@@ -1096,27 +1109,55 @@ function refreshVisualizations() {
         .attr('height', height)
         .attr('viewBox', `0 0 ${width} ${height}`)
         .attr('preserveAspectRatio', 'xMidYMid meet');
+    console.log('SVG element created.');
 
     const x = d3.scaleBand()
         .domain(data.map(d => d.label))
         .range([margin.left, width - margin.right])
         .padding(0.2);
+    console.log('X scale domain:', data.map(d => d.label));
+    console.log('X scale range:', [margin.left, width - margin.right]);
 
     const y = d3.scaleLinear()
         .domain([0, d3.max(data, d => d.value) + 2])
         .nice()
         .range([height - margin.bottom, margin.top]);
+    console.log('Y scale domain:', [0, d3.max(data, d => d.value) + 2]);
+    console.log('Y scale range:', [height - margin.bottom, margin.top]);
 
+    // Render X-axis
     svg.append('g')
         .attr('transform', `translate(0, ${height - margin.bottom})`)
-        .call(d3.axisBottom(x).tickSizeOuter(0));
+        .call(d3.axisBottom(x).tickSizeOuter(0))
+        .selectAll('text')
+        .style('font-size', isMobile ? '12px' : '14px')
+        .style('text-anchor', 'middle');
+    console.log('X-axis rendered.');
 
+    // Render Y-axis
     svg.append('g')
         .attr('transform', `translate(${margin.left}, 0)`)
-        .call(d3.axisLeft(y).ticks(null, 's'));
+        .call(d3.axisLeft(y).ticks(null, 's'))
+        .selectAll('text')
+        .style('font-size', isMobile ? '12px' : '14px');
+    console.log('Y-axis rendered.');
 
-    // Create bars
-    svg.append('g')
+    // Add tooltip
+    const tooltip = d3.select('body')
+        .append('div')
+        .attr('id', 'chart-tooltip')
+        .style('position', 'absolute')
+        .style('background-color', 'rgba(0, 0, 0, 0.75)')
+        .style('color', '#fff')
+        .style('padding', '8px')
+        .style('border-radius', '5px')
+        .style('opacity', 0)
+        .style('pointer-events', 'none')
+        .style('font-size', isMobile ? '12px' : '14px');
+    console.log('Tooltip added.');
+
+    // Create bars with hover functionality
+    const bars = svg.append('g')
         .selectAll('rect')
         .data(data)
         .join('rect')
@@ -1125,16 +1166,32 @@ function refreshVisualizations() {
         .attr('height', d => y(0) - y(d.value))
         .attr('width', x.bandwidth())
         .attr('fill', '#1f77b4')
-        .attr('opacity', 0.7);
+        .attr('opacity', 0.8)
+        .on('mouseover', (event, d) => {
+            console.log('Mouseover on bar:', d);
+            tooltip.style('opacity', 1)
+                .html(`<strong>${d.label}</strong>: ${d.value}`)
+                .style('left', `${event.pageX + 10}px`)
+                .style('top', `${event.pageY - 28}px`);
+        })
+        .on('mousemove', (event) => {
+            tooltip.style('left', `${event.pageX + 10}px`)
+                .style('top', `${event.pageY - 28}px`);
+        })
+        .on('mouseout', () => {
+            tooltip.style('opacity', 0);
+        });
+    console.log('Bars created:', bars.size());
 
     // Add chart title
     svg.append('text')
         .attr('x', width / 2)
         .attr('y', margin.top / 2)
         .attr('text-anchor', 'middle')
-        .attr('font-size', isMobile ? '22px' : '28px') // Adjust font size for mobile
+        .attr('font-size', isMobile ? '18px' : '24px') // Adjust font size for mobile
         .attr('font-weight', 'bold')
         .text('Places Visited');
+    console.log('Chart title added.');
 }
 
         // Update States Table
