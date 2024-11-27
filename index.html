@@ -1601,7 +1601,10 @@ let shareToken = null;
 // Event Listener for Share Button
 // Event Listener for Share Button
 shareButton.addEventListener('click', async () => {
-  if (!currentUser) return;
+  if (!currentUser) {
+    alert("You must be signed in to share your map.");
+    return;
+  }
 
   // Generate a unique share token if it doesn't exist
   if (!shareToken) {
@@ -1616,35 +1619,39 @@ shareButton.addEventListener('click', async () => {
   const link = `${window.location.origin}${basePath}/shared.html?token=${shareToken}`;
   shareableLinkInput.value = link;
   shareLinkDiv.style.display = 'block';
+  alert(`Shareable link created: ${link}`);
 });
 
-// Event Listener for Revoke Sharing Button
 revokeShareButton.addEventListener('click', async () => {
   if (!currentUser || !shareToken) return;
 
-  // Delete shared data from Firestore
-  await deleteSharedData(shareToken);
+  try {
+    // Delete shared data from Firestore
+    await deleteSharedData(shareToken);
 
-  // Reset shareToken and update UI
-  shareToken = null;
-  shareLinkDiv.style.display = 'none';
+    // Reset shareToken and update UI
+    shareToken = null;
+    shareLinkDiv.style.display = 'none';
+    alert("Sharing has been revoked.");
+  } catch (error) {
+    console.error('Error revoking shared data:', error);
+    alert('Failed to revoke sharing. Please try again.');
+  }
 });
 
-// Function to Generate a Unique Share Token
 function generateShareToken() {
-  // Use a combination of user ID and a timestamp or a random string
-  return currentUser.uid + '_' + Date.now();
+  // Use a combination of user ID and a timestamp
+  return `${currentUser.uid}_${Date.now()}`;
 }
 
-// Function to Save Shared Data to Firestore
 async function saveSharedData(token) {
   if (!currentUser) return;
 
   try {
-    // Include ownerUid for security rules
     await setDoc(doc(db, 'sharedData', token), { 
       allData, 
-      ownerUid: currentUser.uid 
+      ownerUid: currentUser.uid, 
+      ownerName: currentUser.displayName || currentUser.email 
     }, { merge: true });
     console.log('Shared data saved successfully.');
   } catch (error) {
@@ -1653,7 +1660,6 @@ async function saveSharedData(token) {
   }
 }
 
-// Function to Delete Shared Data from Firestore
 async function deleteSharedData(token) {
   try {
     await deleteDoc(doc(db, 'sharedData', token));

@@ -1,35 +1,88 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <!-- Include necessary CSS and meta tags -->
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Shared PinMap</title>
     <!-- Bootstrap CSS -->
     <link rel="stylesheet" href="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/css/bootstrap.min.css">
     <!-- Leaflet CSS -->
     <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-    <!-- Custom CSS -->
     <style>
         #map {
             height: 500px;
             width: 100%;
         }
-        /* Additional styles as needed */
+
+        #stats {
+            margin-top: 20px;
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            align-items: center;
+            gap: 20px;
+        }
+
+        .stats-card {
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            background-color: #ffffff;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            padding: 15px;
+            width: 200px;
+            text-align: center;
+            flex: 0 0 auto;
+        }
+
+        .stats-card h2 {
+            margin: 0;
+            font-size: 2rem;
+        }
+
+        .stats-card p {
+            margin: 0;
+            font-size: 1rem;
+            color: #6c757d;
+        }
+
+        #call-to-action {
+            margin-top: 40px;
+            text-align: center;
+        }
+
+        #call-to-action a {
+            display: inline-block;
+            margin-top: 10px;
+            padding: 10px 20px;
+            background-color: #007bff;
+            color: #ffffff;
+            border-radius: 5px;
+            text-decoration: none;
+            font-size: 1.2rem;
+        }
+
+        #call-to-action a:hover {
+            background-color: #0056b3;
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <h1 class="text-center">Shared PinMap</h1>
+        <h1 class="text-center" id="owner-name">Loading Map...</h1>
         <!-- Map Section -->
         <div id="map" style="margin-top: 20px;"></div>
+        <!-- Stats Section -->
+        <div id="stats" class="row"></div>
+        <!-- Call-to-Action Section -->
+        <div id="call-to-action">
+            <p>Want to create your own map and share it with friends?</p>
+            <a href="index.html">Create Your Own Map</a>
+        </div>
     </div>
-    <!-- Firebase SDKs and Application Scripts -->
     <script type="module">
-        // Import Firebase modules
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
         import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
-        // Firebase configuration
         const firebaseConfig = {
             apiKey: "AIzaSyCtGCpWEF0H3eNJ7hasrgQIiVsIjhbQMN8",
             authDomain: "pinmap-31e5f.firebaseapp.com",
@@ -40,19 +93,15 @@
             measurementId: "G-DYJHWZY7V6"
         };
 
-        // Initialize Firebase
         const app = initializeApp(firebaseConfig);
         const db = getFirestore(app);
 
-        // Initialize Leaflet Map
         let map = L.map('map').setView([20, 0], 2);
 
-        // Add OpenStreetMap tiles
         L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
-        // Get the share token from URL parameters
         const urlParams = new URLSearchParams(window.location.search);
         const shareToken = urlParams.get('token');
 
@@ -62,42 +111,99 @@
             alert('No share token provided.');
         }
 
-        // Function to load shared data
-        async function loadSharedData(token) {
-            try {
-                const docRef = doc(db, 'sharedData', token);
-                const docSnap = await getDoc(docRef);
-                if (docSnap.exists()) {
-                    const sharedData = docSnap.data().allData;
-                    displaySharedData(sharedData);
-                } else {
-                    alert('Shared data not found or has been revoked.');
-                }
-            } catch (error) {
-                console.error('Error loading shared data:', error);
-                alert('Failed to load shared data.');
-            }
-        }
+        
 
-        // Function to display shared data on the map
-        function displaySharedData(data) {
-            data.forEach(location => {
-                const popupText = `${location.city}${(location.state) ? ', ' + location.state : ''}${(location.country) ? ', ' + location.country : ''}`;
-                L.marker([location.lat, location.lon]).addTo(map)
-                    .bindPopup(`
-                        <strong>${popupText}</strong><br>
-                        Visits: ${location.visitCount}<br>
-                        Lived In: ${location.livedIn ? 'Yes' : 'No'}
-                    `);
-            });
+        // Function to load shared data
+// Function to load shared data
+// Function to load shared data
+async function loadSharedData(token) {
+    console.log("Loading shared data for token:", token); // Log token
+    try {
+        const docRef = doc(db, 'sharedData', token);
+        const docSnap = await getDoc(docRef);
+        if (docSnap.exists()) {
+            const sharedData = docSnap.data();
+            console.log("Shared data retrieved:", sharedData); // Log retrieved data
+
+            const allData = sharedData.allData;
+            const ownerName = sharedData.ownerName || "Someone";
+
+            console.log("Owner name:", ownerName); // Log owner name
+            displayOwnerName(ownerName);
+            displaySharedData(allData);
+            calculateAndDisplayStats(allData);
+        } else {
+            console.warn("Shared data not found for token:", token); // Log warning
+            alert('Shared data not found or has been revoked.');
         }
+    } catch (error) {
+        console.error("Error loading shared data:", error); // Log error
+        alert('Failed to load shared data.');
+    }
+}
+
+// Function to display owner's full name
+function displayOwnerName(name) {
+    console.log("Displaying owner name:", name); // Log the name to be displayed
+    const ownerNameElement = document.getElementById('owner-name');
+    ownerNameElement.textContent = `${name}'s Shared PinMap`;
+}
+
+// Function to display shared data on the map
+function displaySharedData(data) {
+    console.log("Displaying shared data on map:", data); // Log shared data
+    data.forEach(location => {
+        const popupText = `${location.city}${(location.state) ? ', ' + location.state : ''}${(location.country) ? ', ' + location.country : ''}`;
+        L.marker([location.lat, location.lon]).addTo(map)
+            .bindPopup(`
+                <strong>${popupText}</strong><br>
+                Visits: ${location.visitCount}<br>
+                Lived In: ${location.livedIn ? 'Yes' : 'No'}
+            `);
+    });
+}
+
+// Function to calculate and display stats
+function calculateAndDisplayStats(data) {
+    console.log("Calculating stats from data:", data); // Log input data
+    const visitedStates = new Set();
+    const visitedCities = new Set();
+    const visitedCountries = new Set();
+
+    data.forEach(location => {
+        if (location.state && location.country.toLowerCase() === 'united states') {
+            visitedStates.add(location.state);
+        }
+        if (location.city) {
+            visitedCities.add(location.city);
+        }
+        if (location.country) {
+            visitedCountries.add(location.country);
+        }
+    });
+
+    const stats = [
+        { label: 'States Visited', value: visitedStates.size },
+        { label: 'Cities Visited', value: visitedCities.size },
+        { label: 'Countries Visited', value: visitedCountries.size },
+    ];
+
+    console.log("Calculated stats:", stats); // Log calculated stats
+
+    const statsContainer = document.getElementById('stats');
+    stats.forEach(stat => {
+        const statCard = document.createElement('div');
+        statCard.classList.add('stats-card');
+        statCard.innerHTML = `
+            <h2>${stat.value}</h2>
+            <p>${stat.label}</p>
+        `;
+        statsContainer.appendChild(statCard);
+    });
+}
     </script>
-    <!-- Include necessary JS libraries -->
-    <!-- jQuery -->
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>    
-    <!-- Bootstrap JS -->
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>
-    <!-- Leaflet JS -->
     <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
 </body>
 </html>
