@@ -14,37 +14,50 @@
             width: 100%;
         }
 
+        .hidden {
+    display: none;
+}
+
+.stats-card ul {
+    padding: 0;
+    list-style-type: none;
+}
+
+.stats-card ul li {
+    margin: 5px 0;
+}
+
         #stats {
-    margin-top: 20px;
-    display: flex;
-    flex-direction: column; /* Stack cards vertically */
-    align-items: center; /* Center align all cards horizontally */
-    gap: 20px; /* Space between cards */
-    padding: 10px;
-}
+            margin-top: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 20px;
+            padding: 10px;
+        }
 
-.stats-card {
-    border: 1px solid #dee2e6;
-    border-radius: 8px;
-    background-color: #ffffff;
-    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-    padding: 15px 20px; /* Adjust padding for a more balanced look */
-    width: 100%; /* Full width for responsiveness */
-    max-width: 300px; /* Restrict max width for large screens */
-    text-align: center;
-}
+        .stats-card {
+            border: 1px solid #dee2e6;
+            border-radius: 8px;
+            background-color: #ffffff;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+            padding: 15px 20px;
+            width: 100%;
+            max-width: 300px;
+            text-align: center;
+        }
 
-.stats-card h2 {
-    margin: 0;
-    font-size: 2rem;
-    color: #495057;
-}
+        .stats-card h2 {
+            margin: 0;
+            font-size: 2rem;
+            color: #495057;
+        }
 
-.stats-card p {
-    margin: 5px 0 0;
-    font-size: 1rem;
-    color: #6c757d;
-}
+        .stats-card p {
+            margin: 5px 0 0;
+            font-size: 1rem;
+            color: #6c757d;
+        }
 
         #call-to-action {
             margin-top: 40px;
@@ -74,6 +87,9 @@
         <div id="map" style="margin-top: 20px;"></div>
         <!-- Stats Section -->
         <div id="stats" class="row"></div>
+        <div id="refresh-container" class="text-center" style="margin: 20px;">
+            <button id="refresh-button" class="btn btn-primary">Refresh Map and Stats</button>
+        </div>
         <!-- Call-to-Action Section -->
         <div id="call-to-action">
             <p>Want to create your own map and share it with friends?</p>
@@ -82,7 +98,7 @@
     </div>
     <script type="module">
         import { initializeApp } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-app.js";
-        import { getFirestore, doc, getDoc } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
+        import { getFirestore, doc, getDoc, onSnapshot } from "https://www.gstatic.com/firebasejs/11.0.2/firebase-firestore.js";
 
         const firebaseConfig = {
             apiKey: "AIzaSyCtGCpWEF0H3eNJ7hasrgQIiVsIjhbQMN8",
@@ -103,105 +119,203 @@
             attribution: '&copy; OpenStreetMap contributors'
         }).addTo(map);
 
-        const urlParams = new URLSearchParams(window.location.search);
-        const shareToken = urlParams.get('token');
-
-        if (shareToken) {
-            loadSharedData(shareToken);
-        } else {
-            alert('No share token provided.');
-        }
-
-        
-
-        // Function to load shared data
-// Function to load shared data
-// Function to load shared data
-async function loadSharedData(token) {
-    console.log("Loading shared data for token:", token); // Log token
-    try {
-        const docRef = doc(db, 'sharedData', token);
-        const docSnap = await getDoc(docRef);
-        if (docSnap.exists()) {
-            const sharedData = docSnap.data();
-            console.log("Shared data retrieved:", sharedData); // Log retrieved data
-
-            const allData = sharedData.allData;
-            const ownerName = sharedData.ownerName || "Someone";
-
-            console.log("Owner name:", ownerName); // Log owner name
-            displayOwnerName(ownerName);
-            displaySharedData(allData);
-            calculateAndDisplayStats(allData);
-        } else {
-            console.warn("Shared data not found for token:", token); // Log warning
-            alert('Shared data not found or has been revoked.');
-        }
-    } catch (error) {
-        console.error("Error loading shared data:", error); // Log error
-        alert('Failed to load shared data.');
+        function displayOwnerName(name) {
+    const ownerNameElement = document.getElementById('owner-name');
+    if (ownerNameElement) {
+        ownerNameElement.textContent = `${name}'s Map`;
+    } else {
+        console.warn("Owner name element not found.");
     }
 }
 
-// Function to display owner's full name
-function displayOwnerName(name) {
-    console.log("Displaying owner name:", name); // Log the name to be displayed
-    const ownerNameElement = document.getElementById('owner-name');
-    ownerNameElement.textContent = `${name}'s Shared PinMap`;
-}
+        function displaySharedData(data) {
+            map.eachLayer(layer => {
+                if (layer instanceof L.Marker) map.removeLayer(layer);
+            });
 
-// Function to display shared data on the map
-function displaySharedData(data) {
-    console.log("Displaying shared data on map:", data); // Log shared data
-    data.forEach(location => {
-        const popupText = `${location.city}${(location.state) ? ', ' + location.state : ''}${(location.country) ? ', ' + location.country : ''}`;
-        L.marker([location.lat, location.lon]).addTo(map)
-            .bindPopup(`
-                <strong>${popupText}</strong><br>
-                Visits: ${location.visitCount}<br>
-                Lived In: ${location.livedIn ? 'Yes' : 'No'}
-            `);
-    });
-}
+            data.forEach(location => {
+                const popupText = `${location.city}, ${location.state}, ${location.country}`;
+                L.marker([location.lat, location.lon]).addTo(map).bindPopup(`
+                    <strong>${popupText}</strong><br>
+                    Visits: ${location.visitCount}<br>
+                    Lived In: ${location.livedIn ? "Yes" : "No"}
+                `);
+            });
+        }
 
-// Function to calculate and display stats
-function calculateAndDisplayStats(data) {
-    console.log("Calculating stats from data:", data); // Log input data
+        function calculateAndDisplayStats(data) {
+    const allStates = [
+        "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut",
+        "Delaware", "District of Columbia", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois",
+        "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts",
+        "Michigan", "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada",
+        "New Hampshire", "New Jersey", "New Mexico", "New York", "North Carolina", "North Dakota",
+        "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota",
+        "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming"
+    ];
+
     const visitedStates = new Set();
-    const visitedCities = new Set();
+    const visitedCitiesByState = {}; // U.S. cities grouped by state
+    const visitedCitiesByCountry = {}; // Cities grouped by country (excluding the U.S.)
     const visitedCountries = new Set();
 
     data.forEach(location => {
-        if (location.state && location.country.toLowerCase() === 'united states') {
-            visitedStates.add(location.state);
-        }
-        if (location.city) {
-            visitedCities.add(location.city);
-        }
         if (location.country) {
             visitedCountries.add(location.country);
+
+            if (location.country.toLowerCase() === "united states" && location.state) {
+                visitedStates.add(location.state);
+
+                if (!visitedCitiesByState[location.state]) {
+                    visitedCitiesByState[location.state] = [];
+                }
+                if (location.city) {
+                    visitedCitiesByState[location.state].push(location.city);
+                }
+            } else if (location.city) {
+                if (!visitedCitiesByCountry[location.country]) {
+                    visitedCitiesByCountry[location.country] = [];
+                }
+                visitedCitiesByCountry[location.country].push(location.city);
+            }
         }
     });
 
-    const stats = [
-        { label: 'States Visited', value: visitedStates.size },
-        { label: 'Cities Visited', value: visitedCities.size },
-        { label: 'Countries Visited', value: visitedCountries.size },
-    ];
+    // Sort states, cities, and countries
+    const sortedVisitedStates = Array.from(visitedStates).sort();
+    const missingStates = allStates.filter(state => !visitedStates.has(state)).sort();
+    const sortedVisitedCountries = Array.from(visitedCountries).sort();
 
-    console.log("Calculated stats:", stats); // Log calculated stats
+    // Sort cities within each state
+    Object.keys(visitedCitiesByState).forEach(state => {
+        visitedCitiesByState[state].sort();
+    });
 
-    const statsContainer = document.getElementById('stats');
-    stats.forEach(stat => {
-        const statCard = document.createElement('div');
-        statCard.classList.add('stats-card');
-        statCard.innerHTML = `
-            <h2>${stat.value}</h2>
-            <p>${stat.label}</p>
-        `;
-        statsContainer.appendChild(statCard);
+    // Sort cities within each country
+    Object.keys(visitedCitiesByCountry).forEach(country => {
+        visitedCitiesByCountry[country].sort();
+    });
+
+    const allStatesVisited = missingStates.length === 0;
+
+    const statsContainer = document.getElementById("stats");
+    statsContainer.innerHTML = `
+        <div class="stats-card">
+            <h2>${sortedVisitedStates.length}${allStatesVisited ? " ★" : ""}</h2>
+            <p>States Visited</p>
+            <button id="toggle-states-details" class="btn btn-link">Show Details</button>
+            <div id="states-details" class="hidden">
+                <strong>Visited States:</strong>
+                <ul>${sortedVisitedStates.map(state => `<li>${state}</li>`).join("")}</ul>
+                <strong>Missing States:</strong>
+                <ul>${missingStates.map(state => `<li>${state}</li>`).join("")}</ul>
+            </div>
+        </div>
+        <div class="stats-card">
+            <h2>${Object.keys(visitedCitiesByState).length + Object.keys(visitedCitiesByCountry).length}</h2>
+            <p>Cities Visited</p>
+            <button id="toggle-cities-details" class="btn btn-link">Show Details</button>
+            <div id="cities-details" class="hidden">
+                <strong>Visited Cities in the U.S.:</strong>
+                <ul>
+                    ${Object.keys(visitedCitiesByState).sort().map(state => `
+                        <li>
+                            <strong>${state}:</strong> ${visitedCitiesByState[state].join(", ")}
+                        </li>
+                    `).join("")}
+                </ul>
+                <strong>Visited Cities Outside the U.S.:</strong>
+                <ul>
+                    ${Object.keys(visitedCitiesByCountry).sort().map(country => `
+                        <li>
+                            <strong>${country}:</strong> ${visitedCitiesByCountry[country].join(", ")}
+                        </li>
+                    `).join("")}
+                </ul>
+            </div>
+        </div>
+        <div class="stats-card">
+            <h2>${sortedVisitedCountries.length}</h2>
+            <p>Countries Visited</p>
+            <button id="toggle-countries-details" class="btn btn-link">Show Details</button>
+            <div id="countries-details" class="hidden">
+                <strong>Visited Countries:</strong>
+                <ul>${sortedVisitedCountries.map(country => `<li>${country}</li>`).join("")}</ul>
+            </div>
+        </div>
+    `;
+
+    // Add event listeners after rendering
+    document.getElementById("toggle-states-details").addEventListener("click", () => {
+        document.getElementById("states-details").classList.toggle("hidden");
+    });
+
+    document.getElementById("toggle-cities-details").addEventListener("click", () => {
+        document.getElementById("cities-details").classList.toggle("hidden");
+    });
+
+    document.getElementById("toggle-countries-details").addEventListener("click", () => {
+        document.getElementById("countries-details").classList.toggle("hidden");
     });
 }
+
+function toggleDetails(section) {
+    const details = document.getElementById(`${section}-details`);
+    if (details) {
+        details.classList.toggle("hidden");
+    }
+}
+
+// Make toggleDetails globally accessible
+window.toggleDetails = toggleDetails;
+
+        async function loadSharedUserData(uid) {
+    try {
+        // Reference the user's document in Firestore
+        const userRef = doc(db, "users", uid);
+        const userSnap = await getDoc(userRef);
+
+        if (userSnap.exists()) {
+            const userData = userSnap.data();
+            const ownerName = userData.ownerName || userData.email || "Unknown User";
+            const allData = userData.allData || [];
+
+            console.log("Fetched user data:", userData);
+
+            // Update the UI with the owner's name
+            displayOwnerName(ownerName);
+
+            // Display the shared data
+            displaySharedData(allData);
+            calculateAndDisplayStats(allData);
+        } else {
+            console.warn("No user data found for UID:", uid);
+            alert("No shared data found or the user may have deleted their data.");
+        }
+    } catch (error) {
+        console.error("Error fetching user data:", error);
+        alert("Failed to load shared data. Please try again later.");
+    }
+}
+
+// Extract UID from the URL and load the data
+const urlParams = new URLSearchParams(window.location.search);
+const uid = urlParams.get("uid");
+
+if (uid) {
+    loadSharedUserData(uid);
+} else {
+    console.error("No UID provided in the URL.");
+    alert("Invalid or missing share link.");
+}
+
+        
+
+        
+
+        document.getElementById("refresh-button").addEventListener("click", () => {
+            if (uid) loadSharedDataFromUid(uid);
+        });
     </script>
     <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>    
     <script src="https://maxcdn.bootstrapcdn.com/bootstrap/3.4.1/js/bootstrap.min.js"></script>

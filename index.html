@@ -419,6 +419,44 @@ tfoot td {
             console.log("Map click event listener added.");
         }
 
+    
+
+async function updateUserNameInUsersCollection(uid, name, email) {
+    if (!uid || !name) {
+        console.error("Invalid UID or name provided.");
+        return;
+    }
+
+    try {
+        // Reference the user's document in the `users` collection
+        const userRef = doc(db, "users", uid);
+
+        // Update or set the `ownerName` and `email` fields
+        await setDoc(
+            userRef,
+            { ownerName: name, email: email || "Unknown Email" },
+            { merge: true }
+        );
+        console.log(`Owner name "${name}" and email "${email}" have been added/updated in the users collection.`);
+    } catch (error) {
+        console.error("Error updating ownerName in users collection:", error);
+    }
+}
+
+onAuthStateChanged(auth, async (user) => {
+    if (user) {
+        const uid = user.uid;
+        const displayName = user.displayName || user.email || "Unknown User";
+        const email = user.email;
+
+        // Ensure the ownerName is added to the users collection
+        await updateUserNameInUsersCollection(uid, displayName, email);
+    } else {
+        console.log("No user is signed in.");
+    }
+});
+
+
         // Handle map click
         async function onMapClick(e) {
             const { lat, lng } = e.latlng;
@@ -632,8 +670,19 @@ function populateModalFields(geoData) {
         });
 
         // Listen to Authentication State Changes
-        onAuthStateChanged(auth, (user) => {
-  updateUI(user); // Update the UI based on auth state
+       // In your onAuthStateChanged listener:
+onAuthStateChanged(auth, (user) => {
+  if (user) {
+    console.log("User authenticated:", user);
+    currentUser = user;
+    updateUI(user); 
+    loadUserData();  // Load data when user logs in
+  } else {
+    console.log("User signed out.");
+    currentUser = null;
+    updateUI(null); 
+    // Do NOT clear data here. Let the user continue with local data.
+  }
 });
 
         // Firestore References
@@ -642,91 +691,65 @@ function populateModalFields(geoData) {
         }
 
         // Load User Data from Firestore
+        // Load User Data from Firestore
         async function loadUserData() {
-            if (!currentUser) return;
+  if (!currentUser) {
+    console.log("loadUserData() called but no user is logged in."); 
+    return;
+  }
 
-            const userDocRef = getUserDocRef(currentUser.uid);
-            try {
-                const docSnap = await getDoc(userDocRef);
-                if (docSnap.exists()) {
-                    allData = docSnap.data().allData || [];
-                    console.log("User data loaded from Firestore:", allData);
-
-                    // Clear existing markers
-                    markers.forEach(marker => {
-                        map.removeLayer(marker);
-                    });
-                    markers = [];
-
-                    // Initialize Sets
-                    const visitedStates = new Set();
-                    const visitedCities = new Set();
-                    const visitedCountries = new Set();
-                    const visitedZipCodes = new Set();
-
-                    allData.forEach(location => {
-                        if (location.state && location.country.toLowerCase() === 'united states') {
-        visitedStates.add(location.state);
+  const userDocRef = getUserDocRef(currentUser.uid);
+  try {
+    const docSnap = await getDoc(userDocRef);
+    if (docSnap.exists()) {
+      allData = docSnap.data().allData || [];
+      console.log("User data loaded from Firestore:", allData);
+      localStorage.setItem('allData', JSON.stringify(allData)); 
+      refreshVisualizations(); 
+    } else {
+      console.log("No data found in Firestore for this user.");
+      allData = [];
+      saveData(); 
     }
-                        if (location.city) visitedCities.add(location.city);
-                        if (location.country) visitedCountries.add(location.country);
-                        if (location.zip) visitedZipCodes.add(location.zip);
-                    });
+  } catch (error) {
+    console.error('Error fetching user data from Firestore:', error);
+    loadLocalData();
+    alert('Failed to load your data from Firestore. Using local data instead.');
+  }
+}
 
-                    console.log("Visited States:", visitedStates);
-                    console.log("Visited Cities:", visitedCities);
-                    console.log("Visited Countries:", visitedCountries);
-                    console.log("Visited ZIP Codes:", visitedZipCodes);
-
-                    // Add markers to the map
-                    allData.forEach(location => {
-                        const popupText = `${location.city}${(location.country.toLowerCase() === 'united states' && location.state) ? ', ' + location.state : ''}`;
-                        const locationKey = `${location.lat},${location.lon}_${location.city.toLowerCase()}_${location.state.toLowerCase()}`;
-                        const popupContent = `
-                            <strong>${popupText}</strong><br>
-                            Visits: ${location.visitCount}<br>
-                            <button class="btn btn-xs btn-danger" onclick="deleteLocation('${locationKey}')">Delete</button>
-                        `;
-                        const marker = L.marker([location.lat, location.lon]).addTo(map)
-                            .bindPopup(popupContent);
-                        markers.push(marker);
-                        markerMap.set(locationKey, marker);
-                        console.log("Marker added to map:", popupText);
-                    });
-
-                    // Update visualizations
-                    updateChart(visitedCountries, visitedStates, visitedCities, visitedZipCodes);
-                    updateStatesTable(visitedStates);
-                    updateCitiesTable(visitedCities);
-                    updateCountriesTable(visitedCountries);
-                    updateZipCodesTable(visitedZipCodes);
-
-                    // Initialize heatmap with loaded data
-                    updateHeatmap();
-                } else {
-                    console.log("No data found for this user. Initializing empty data structures.");
-                    allData = [];
-                    saveData();
-                }
-            } catch (error) {
-                console.error('Error fetching user data:', error);
-                alert('Failed to load your data. Please try again.');
-            }
-        }
+// Load Local Data
+function loadLocalData() {
+  const localData = localStorage.getItem('allData');
+  if (localData) {
+    allData = JSON.parse(localData);
+    console.log("Local data loaded:", allData);
+    refreshVisualizations();
+  } else {
+    console.log("No local data found.");
+    allData = [];
+  }
+}
 
         // Save User Data to Firestore
+        // Save User Data to Firestore
         async function saveData() {
-            if (!currentUser) return;
+  if (!currentUser) {
+    console.log("saveData() called but no user is logged in."); 
+    return;
+  }
 
-            const userDocRef = getUserDocRef(currentUser.uid);
-            try {
-                await setDoc(userDocRef, { allData }, { merge: true });
-                console.log('User data saved successfully.');
-            } catch (error) {
-                console.error('Error saving user data:', error);
-                alert('Failed to save your data. Please try again.');
-            }
-        }
+  const userDocRef = getUserDocRef(currentUser.uid);
+  try {
+    await setDoc(userDocRef, { allData }, { merge: true });
+    console.log('User data saved to Firestore.');
+    localStorage.setItem('allData', JSON.stringify(allData)); 
+  } catch (error) {
+    console.error('Error saving user data to Firestore:', error);
+    alert('Failed to save your data. Please try again.');
+  }
+}
+
 
         // Handle Add Location Form Submission
         // Modify the location form submission handler
@@ -967,34 +990,41 @@ function refreshMarkers() {
     });
 }
 function refreshVisualizations() {
-    // Update markers
-    refreshMarkers();
+  // Clear existing markers before adding new ones
+  markers.forEach(marker => map.removeLayer(marker));
+  markers = [];
+  markerMap.clear();
 
-    // Other updates...
-    // Rebuild the sets
-    const visitedStates = new Set();
-    const visitedCities = new Set();
-    const visitedCountries = new Set();
-    const visitedZipCodes = new Set();
+  // Add markers to the map
+  allData.forEach(location => {
+    const popupText = `${location.city}${(location.country.toLowerCase() === 'united states' && location.state) ? ', ' + location.state : ''}`;
+    addMarker(location.lat, location.lon, popupText, location);
+  });
 
-    allData.forEach(location => {
-        if (location.state && location.country.toLowerCase() === 'united states') {
-            visitedStates.add(location.state);
-        }
-        if (location.city) visitedCities.add(location.city);
-        if (location.country) visitedCountries.add(location.country);
-        if (location.zip) visitedZipCodes.add(location.zip);
-    });
+  // Rebuild the sets
+  const visitedStates = new Set();
+  const visitedCities = new Set();
+  const visitedCountries = new Set();
+  const visitedZipCodes = new Set();
 
-    // Update visualizations
-    updateChart(visitedCountries, visitedStates, visitedCities, visitedZipCodes);
-    updateStatesTable(visitedStates);
-    updateCitiesTable(visitedCities);
-    updateCountriesTable(visitedCountries);
-    updateZipCodesTable(visitedZipCodes);
+  allData.forEach(location => {
+    if (location.state && location.country.toLowerCase() === 'united states') {
+      visitedStates.add(location.state);
+    }
+    if (location.city) visitedCities.add(location.city);
+    if (location.country) visitedCountries.add(location.country);
+    if (location.zip) visitedZipCodes.add(location.zip);
+  });
 
-    // Update heatmap data
-    updateHeatmap();
+  // Update visualizations
+  updateChart(visitedCountries, visitedStates, visitedCities, visitedZipCodes);
+  updateStatesTable(visitedStates);
+  updateCitiesTable(visitedCities);
+  updateCountriesTable(visitedCountries);
+  updateZipCodesTable(visitedZipCodes);
+
+  // Update heatmap data
+  updateHeatmap();
 }
 
         // Delete Location Function
@@ -1675,74 +1705,53 @@ let shareToken = null;
 
 // Event Listener for Share Button
 // Event Listener for Share Button
-shareButton.addEventListener('click', async () => {
+shareButton.addEventListener('click', () => {
   if (!currentUser) {
     alert("You must be signed in to share your map.");
     return;
   }
 
-  // Generate a unique share token if it doesn't exist
-  if (!shareToken) {
-    shareToken = generateShareToken();
-    await saveSharedData(shareToken);
-  }
+  // Generate the shareable link using the current user's UID
+  const link = `${window.location.origin}/shared.html?uid=${currentUser.uid}`;
+  console.log('Generated shareable link:', link);
 
-  // Get the base path up to the current directory
-  const basePath = window.location.pathname.substring(0, window.location.pathname.lastIndexOf('/'));
-
-  // Construct the correct shareable link
-  const link = `${window.location.origin}${basePath}/shared.html?token=${shareToken}`;
+  // Display the link
   shareableLinkInput.value = link;
   shareLinkDiv.style.display = 'block';
   alert(`Shareable link created: ${link}`);
 });
 
-revokeShareButton.addEventListener('click', async () => {
-  if (!currentUser || !shareToken) return;
+async function generateShareLink() {
+    if (!currentUser) {
+        console.error("No authenticated user.");
+        alert("You must be logged in to generate a shareable link.");
+        return;
+    }
 
-  try {
-    // Delete shared data from Firestore
-    await deleteSharedData(shareToken);
+    try {
+        // Fetch the user's `ownerName` from the `users` collection
+        const userRef = doc(db, "users", currentUser.uid);
+        const userSnap = await getDoc(userRef);
 
-    // Reset shareToken and update UI
-    shareToken = null;
-    shareLinkDiv.style.display = 'none';
-    alert("Sharing has been revoked.");
-  } catch (error) {
-    console.error('Error revoking shared data:', error);
-    alert('Failed to revoke sharing. Please try again.');
-  }
-});
+        let ownerName = "Unknown User";
+        if (userSnap.exists()) {
+            ownerName = userSnap.data().ownerName || "Unknown User";
+        }
 
-function generateShareToken() {
-  // Use a combination of user ID and a timestamp
-  return `${currentUser.uid}_${Date.now()}`;
-}
+        // Use the UID for the shareable link
+        const shareLink = `${window.location.origin}/shared.html?uid=${currentUser.uid}`;
+        console.log("Shareable link:", shareLink);
 
-async function saveSharedData(token) {
-  if (!currentUser) return;
+        // Display the link with owner's name
+        const shareableLinkInput = document.getElementById("shareable-link");
+        shareableLinkInput.value = shareLink;
+        shareableLinkInput.style.display = "block";
 
-  try {
-    await setDoc(doc(db, 'sharedData', token), { 
-      allData, 
-      ownerUid: currentUser.uid, 
-      ownerName: currentUser.displayName || currentUser.email 
-    }, { merge: true });
-    console.log('Shared data saved successfully.');
-  } catch (error) {
-    console.error('Error saving shared data:', error);
-    alert('Failed to share your data. Please try again.');
-  }
-}
-
-async function deleteSharedData(token) {
-  try {
-    await deleteDoc(doc(db, 'sharedData', token));
-    console.log('Shared data deleted successfully.');
-  } catch (error) {
-    console.error('Error deleting shared data:', error);
-    alert('Failed to revoke sharing. Please try again.');
-  }
+        alert(`Shareable link created for ${ownerName}: ${shareLink}`);
+    } catch (error) {
+        console.error("Error fetching ownerName for share link:", error);
+        alert("Failed to generate a shareable link. Please try again.");
+    }
 }
 
         // Handle Confirmation Modal Submission
