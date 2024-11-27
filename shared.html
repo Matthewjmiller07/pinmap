@@ -15,35 +15,36 @@
         }
 
         #stats {
-            margin-top: 20px;
-            display: flex;
-            flex-wrap: wrap;
-            justify-content: center;
-            align-items: center;
-            gap: 20px;
-        }
+    margin-top: 20px;
+    display: flex;
+    flex-direction: column; /* Stack cards vertically */
+    align-items: center; /* Center align all cards horizontally */
+    gap: 20px; /* Space between cards */
+    padding: 10px;
+}
 
-        .stats-card {
-            border: 1px solid #dee2e6;
-            border-radius: 8px;
-            background-color: #ffffff;
-            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
-            padding: 15px;
-            width: 200px;
-            text-align: center;
-            flex: 0 0 auto;
-        }
+.stats-card {
+    border: 1px solid #dee2e6;
+    border-radius: 8px;
+    background-color: #ffffff;
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+    padding: 15px 20px; /* Adjust padding for a more balanced look */
+    width: 100%; /* Full width for responsiveness */
+    max-width: 300px; /* Restrict max width for large screens */
+    text-align: center;
+}
 
-        .stats-card h2 {
-            margin: 0;
-            font-size: 2rem;
-        }
+.stats-card h2 {
+    margin: 0;
+    font-size: 2rem;
+    color: #495057;
+}
 
-        .stats-card p {
-            margin: 0;
-            font-size: 1rem;
-            color: #6c757d;
-        }
+.stats-card p {
+    margin: 5px 0 0;
+    font-size: 1rem;
+    color: #6c757d;
+}
 
         #call-to-action {
             margin-top: 40px;
