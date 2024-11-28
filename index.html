@@ -278,7 +278,6 @@ tfoot td {
     <div id="share-link" class="hidden mt-3">
         <p>Your shareable link:</p>
         <input type="text" id="shareable-link" class="form-control" readonly>
-        <button id="revoke-share-button" class="btn btn-warning mt-2">Revoke Sharing</button>
     </div>
 </div>
 
@@ -1265,6 +1264,11 @@ function refreshVisualizations() {
 
     console.log('States Data:', filteredData);
 
+    // Separate D.C. from the rest of the states
+    const dcData = filteredData.filter(d => d.state === "District of Columbia");
+    const statesData = filteredData.filter(d => d.state !== "District of Columbia");
+
+
     // Create the table element
     const table = d3.select('#statesTable').append('table').attr('class', 'table table-striped table-bordered');
     const thead = table.append('thead');
@@ -1283,22 +1287,42 @@ function refreshVisualizations() {
         .text(d => d)
         .style('cursor', 'pointer');
 
-    // Append rows to the tbody
+    // Append rows to the tbody for regular states
     const rows = tbody.selectAll('tr')
-        .data(filteredData)
+        .data(statesData)
         .enter()
         .append('tr');
 
-    // Append cells to each row
+    // Append cells to each row (for regular states)
     rows.selectAll('td')
         .data(d => [d.state, d.visitCount])
         .enter()
         .append('td')
         .text(d => d);
 
-    // Calculate Running Total as the number of unique states
-    const runningTotal = filteredData.length;
+    // Append a separator row
+    tbody.append('tr')
+        .append('td')
+        .attr('colspan', '2')
+        .attr('style', 'border-bottom: 2px solid #dee2e6;'); 
+
+    // Append rows to the tbody for D.C.
+    const dcRows = tbody.selectAll('tr.dc-row')
+        .data(dcData)
+        .enter()
+        .append('tr')
+        .attr('class', 'dc-row');
+
+    dcRows.selectAll('td')
+        .data(d => [d.state + '*', d.visitCount]) // Add asterisk to D.C.
+        .enter()
+        .append('td')
+        .text(d => d);
+
+    // Calculate Running Total as the number of unique states (excluding D.C.)
+    const runningTotal = statesData.length;
     console.log('Running Total (States):', runningTotal);
+
 
     // Append a footer row with the running total
     tfoot.append('tr')
@@ -1309,6 +1333,13 @@ function refreshVisualizations() {
         .attr('colspan', '2') // Span across two columns
         .attr('style', 'font-weight: bold; text-align: right; background-color: #f2f2f2;')
         .text(d => d);
+
+    // Add a note about D.C.
+    tfoot.append('tr')
+        .append('td')
+        .attr('colspan', '2')
+        .attr('style', 'font-size: 0.9em; text-align: left;') // Smaller font and left align
+        .text('*District of Columbia is not included in the state count.');
 }
 
         // Update Cities Table

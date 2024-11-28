@@ -146,31 +146,41 @@
         function calculateAndDisplayStats(data) {
     const allStates = [
         "Alabama", "Alaska", "Arizona", "Arkansas", "California", "Colorado", "Connecticut",
-        "Delaware", "District of Columbia", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois",
-        "Indiana", "Iowa", "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts",
-        "Michigan", "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada",
-        "New Hampshire", "New Jersey", "New Mexico", "New York", "North Carolina", "North Dakota",
-        "Ohio", "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota",
-        "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia", "Wisconsin", "Wyoming"
+        "Delaware", "Florida", "Georgia", "Hawaii", "Idaho", "Illinois", "Indiana", "Iowa",
+        "Kansas", "Kentucky", "Louisiana", "Maine", "Maryland", "Massachusetts", "Michigan",
+        "Minnesota", "Mississippi", "Missouri", "Montana", "Nebraska", "Nevada", "New Hampshire",
+        "New Jersey", "New Mexico", "New York", "North Carolina", "North Dakota", "Ohio",
+        "Oklahoma", "Oregon", "Pennsylvania", "Rhode Island", "South Carolina", "South Dakota",
+        "Tennessee", "Texas", "Utah", "Vermont", "Virginia", "Washington", "West Virginia",
+        "Wisconsin", "Wyoming"
     ];
 
     const visitedStates = new Set();
-    const visitedCitiesByState = {}; // U.S. cities grouped by state
-    const visitedCitiesByCountry = {}; // Cities grouped by country (excluding the U.S.)
+    const visitedCitiesByState = {}; 
+    const visitedCitiesByCountry = {}; 
     const visitedCountries = new Set();
+    let dcVisited = false; 
 
     data.forEach(location => {
         if (location.country) {
+            const countryName = location.country.toLowerCase();
             visitedCountries.add(location.country);
 
-            if (location.country.toLowerCase() === "united states" && location.state) {
-                visitedStates.add(location.state);
+            if (countryName === "united states") {
+                if (location.state) {
+                    const stateName = location.state.toLowerCase();
+                    if (stateName === "district of columbia") {
+                        dcVisited = true;
+                    } else if (allStates.includes(location.state)) {
+                        visitedStates.add(location.state);
+                    }
 
-                if (!visitedCitiesByState[location.state]) {
-                    visitedCitiesByState[location.state] = [];
-                }
-                if (location.city) {
-                    visitedCitiesByState[location.state].push(location.city);
+                    if (!visitedCitiesByState[location.state]) {
+                        visitedCitiesByState[location.state] = [];
+                    }
+                    if (location.city) {
+                        visitedCitiesByState[location.state].push(location.city);
+                    }
                 }
             } else if (location.city) {
                 if (!visitedCitiesByCountry[location.country]) {
@@ -187,21 +197,21 @@
     const sortedVisitedCountries = Array.from(visitedCountries).sort();
 
     // Sort cities within each state
-    Object.keys(visitedCitiesByState).forEach(state => {
+    for (const state in visitedCitiesByState) {
         visitedCitiesByState[state].sort();
-    });
+    }
 
     // Sort cities within each country
-    Object.keys(visitedCitiesByCountry).forEach(country => {
+    for (const country in visitedCitiesByCountry) {
         visitedCitiesByCountry[country].sort();
-    });
+    }
 
-    const allStatesVisited = missingStates.length === 0;
+    const allStatesVisited = missingStates.length === 0 && !dcVisited;
 
     const statsContainer = document.getElementById("stats");
     statsContainer.innerHTML = `
         <div class="stats-card">
-            <h2>${sortedVisitedStates.length}${allStatesVisited ? " ★" : ""}</h2>
+            <h2>${visitedStates.size}${allStatesVisited ? " ★" : ""}${dcVisited ? " + D.C." : ""}</h2> 
             <p>States Visited</p>
             <button id="toggle-states-details" class="btn btn-link">Show Details</button>
             <div id="states-details" class="hidden">
@@ -209,6 +219,7 @@
                 <ul>${sortedVisitedStates.map(state => `<li>${state}</li>`).join("")}</ul>
                 <strong>Missing States:</strong>
                 <ul>${missingStates.map(state => `<li>${state}</li>`).join("")}</ul>
+                ${dcVisited ? "<p><i>(District of Columbia is not included in the state count)</i></p>" : ""} 
             </div>
         </div>
         <div class="stats-card">
@@ -235,15 +246,18 @@
             </div>
         </div>
         <div class="stats-card">
-            <h2>${sortedVisitedCountries.length}</h2>
+            <h2>${visitedCountries.size}</h2>
             <p>Countries Visited</p>
             <button id="toggle-countries-details" class="btn btn-link">Show Details</button>
             <div id="countries-details" class="hidden">
                 <strong>Visited Countries:</strong>
-                <ul>${sortedVisitedCountries.map(country => `<li>${country}</li>`).join("")}</ul>
+                <ul>${Array.from(visitedCountries).sort().map(country => `<li>${country}</li>`).join("")}</ul>
             </div>
         </div>
     `;
+
+    // ... (your code to add event listeners) ...
+
 
     // Add event listeners after rendering
     document.getElementById("toggle-states-details").addEventListener("click", () => {
