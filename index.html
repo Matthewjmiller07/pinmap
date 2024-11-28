@@ -443,7 +443,9 @@ async function updateUserNameInUsersCollection(uid, name, email) {
     }
 }
 
+// Single onAuthStateChanged Listener
 onAuthStateChanged(auth, async (user) => {
+    updateUI(user); // Update UI first
     if (user) {
         const uid = user.uid;
         const displayName = user.displayName || user.email || "Unknown User";
@@ -451,8 +453,22 @@ onAuthStateChanged(auth, async (user) => {
 
         // Ensure the ownerName is added to the users collection
         await updateUserNameInUsersCollection(uid, displayName, email);
+
+        console.log("User authenticated:", user);
+        currentUser = user;
+        loadUserData().then(() => { 
+            console.log("User data loaded, now refreshing visualizations.");
+            refreshVisualizations(); // Refresh after data is loaded
+        }).catch(error => {
+            console.error("Error loading user data:", error);
+            // Handle the error, e.g., show an error message to the user
+        });
     } else {
-        console.log("No user is signed in.");
+        console.log("User signed out.");
+        currentUser = null;
+        // If you want to clear data on sign-out, keep the line below:
+        clearAllData(); 
+        // Otherwise, comment it out or remove it to persist data
     }
 });
 
@@ -579,7 +595,7 @@ function populateModalFields(geoData) {
 
 
         // Update UI Based on Authentication
-        function updateUI(user) {
+        async function updateUI(user) {
   if (user) {
     // User is signed in
     currentUser = user;
@@ -601,23 +617,14 @@ function populateModalFields(geoData) {
       initializeMap();
     }
 
-    // Load user data from Firestore
-    const localData = localStorage.getItem('allData');
-    if (localData) {
-      const parsedLocalData = JSON.parse(localData);
-      if (parsedLocalData.length > 0) {
-        if (confirm('Merge local data with your account?')) {
-          loadUserDataAndMerge(user.uid, parsedLocalData);
-        } else {
-          loadUserData(user.uid);
-        }
-        localStorage.removeItem('allData');
-      } else {
-        loadUserData(user.uid);
-      }
-    } else {
-      loadUserData(user.uid);
+    try {
+      await loadUserData(); // Wait for data to load
+      refreshVisualizations(); // Now refresh the UI
+    } catch (error) {
+      console.error('Error loading data:', error); 
+      alert('Failed to load your data. Please try again later.'); 
     }
+
   } else {
     // User is signed out
     currentUser = null;
@@ -631,7 +638,7 @@ function populateModalFields(geoData) {
     chartContainer.classList.remove('hidden');
     tablesContainer.classList.remove('hidden');
     resetButton.parentElement.classList.remove('hidden');
-    shareButton.classList.add('hidden');
+    shareButton.classList.add('hidden'); 
 
     // Initialize map if not already initialized
     if (!map) {
@@ -639,9 +646,10 @@ function populateModalFields(geoData) {
     }
 
     // Load data from localStorage
-    loadLocalData();
+    loadLocalData(); 
   }
 }
+
 
         // Authentication Event Listeners
         loginButton.addEventListener('click', () => {
@@ -669,21 +677,8 @@ function populateModalFields(geoData) {
                 });
         });
 
-        // Listen to Authentication State Changes
-       // In your onAuthStateChanged listener:
-onAuthStateChanged(auth, (user) => {
-  if (user) {
-    console.log("User authenticated:", user);
-    currentUser = user;
-    updateUI(user); 
-    loadUserData();  // Load data when user logs in
-  } else {
-    console.log("User signed out.");
-    currentUser = null;
-    updateUI(null); 
-    // Do NOT clear data here. Let the user continue with local data.
-  }
-});
+        
+
 
         // Firestore References
         function getUserDocRef(uid) {
@@ -705,16 +700,14 @@ onAuthStateChanged(auth, (user) => {
       allData = docSnap.data().allData || [];
       console.log("User data loaded from Firestore:", allData);
       localStorage.setItem('allData', JSON.stringify(allData)); 
-      refreshVisualizations(); 
     } else {
       console.log("No data found in Firestore for this user.");
-      allData = [];
-      saveData(); 
+      allData = []; 
+      // DO NOT call saveData() here to avoid overwriting Firestore
     }
   } catch (error) {
     console.error('Error fetching user data from Firestore:', error);
-    loadLocalData();
-    alert('Failed to load your data from Firestore. Using local data instead.');
+    throw error; // Re-throw the error to be handled by the caller
   }
 }
 
@@ -746,7 +739,7 @@ function loadLocalData() {
     localStorage.setItem('allData', JSON.stringify(allData)); 
   } catch (error) {
     console.error('Error saving user data to Firestore:', error);
-    alert('Failed to save your data. Please try again.');
+    alert('Failed to save your data. Please try again.'); 
   }
 }
 
@@ -1703,16 +1696,23 @@ const revokeShareButton = document.getElementById('revoke-share-button');
 // Application State
 let shareToken = null;
 
-// Event Listener for Share Button
-// Event Listener for Share Button
 shareButton.addEventListener('click', () => {
   if (!currentUser) {
     alert("You must be signed in to share your map.");
     return;
   }
 
-  // Generate the shareable link using the current user's UID
-  const link = `${window.location.origin}/shared.html?uid=${currentUser.uid}`;
+  // Get the current path 
+  const currentPath = window.location.pathname; 
+
+  // Extract the directory (e.g., "pinmap" if the path is "/pinmap/")
+  const directory = currentPath.substring(1, currentPath.indexOf('/', 1)); 
+
+  // Generate the shareable link, dynamically including the directory if present
+  const link = directory 
+    ? `${window.location.origin}/${directory}/shared.html?uid=${currentUser.uid}` 
+    : `${window.location.origin}/shared.html?uid=${currentUser.uid}`;
+
   console.log('Generated shareable link:', link);
 
   // Display the link
@@ -1720,6 +1720,7 @@ shareButton.addEventListener('click', () => {
   shareLinkDiv.style.display = 'block';
   alert(`Shareable link created: ${link}`);
 });
+
 
 async function generateShareLink() {
     if (!currentUser) {
